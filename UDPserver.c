@@ -22,6 +22,7 @@ struct ping_protocol{
 
 };
 //peppone
+//visao ciao
 
 pthread_mutex_t mutex_peer;
 void* insert_peers(void*);

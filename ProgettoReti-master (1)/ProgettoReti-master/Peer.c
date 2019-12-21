@@ -12,8 +12,16 @@
 #include <sys/select.h>
 
 #include "hash.h"
+/*
+
+  LE SCANF FUNZIONANO, IL PROBLEMA ORA È CHE SICCOME PRIMA DELLA SCANF DEL MAIN, SUBITO DOPO IL WHILE, C'È IL LOCK DEL MUTEX,
+  LA RICEZIONE NELLA FUNZIONE OPEN_PORT È BLOCCATA FINO A QUANDO NON VIENE COMPLETATA QUELLA RICHIESTA.
 
 
+
+
+
+*/
 struct ping_protocol{
     char name;
     int rec_port;
@@ -32,6 +40,7 @@ void * trackerConnect(void *);
 pthread_t thread_peer, thread_action,thread_receive;
 
 pthread_mutex_t mutex_peer = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_choice= PTHREAD_MUTEX_INITIALIZER;
 //pthread_mutex_init(&mutex_peer,NULL);
 
 
@@ -161,14 +170,16 @@ void *openPort(void* arg){
          perror("accept");
          exit(1);
       }
-        pthread_mutex_lock(&mutex_peer);
+        printf("C'È UN TENTATIVO DI CONNESSIONE !!\n");
+        pthread_mutex_lock(&mutex_choice);
+
         IN_PAUSE=1;
         int lungh;
         read(connfd,&lungh,sizeof(int));
         read(connfd,recvline2,lungh*sizeof(char));
         printf("%s\n",recvline2 );
         printf("ACCETTI LA CONNESSIONE?\n 3) Accetto \n 4)Rifiuti\n");
-        scanf("%d",&choice); //QUESTA NON VA MAI; ALTRA RIGO 238
+        scanf("%d",&choice);
         if(choice==3){
 
               write(connfd,&choice,sizeof(int));
@@ -184,23 +195,21 @@ void *openPort(void* arg){
 
               }
 
-          pthread_mutex_unlock(&mutex_peer);
+          pthread_mutex_unlock(&mutex_choice);
           IN_PAUSE=0;
 
     }
 
     exit(0);
 }
-//SE AVVII CHE FA?
-//
-//
+
 int main(int argc, char **argv)
 {
 
   char sendbuff[4096],recvbuff[4096];
   fd_set fset;
   int fdInt[10000];
-  //int listenfd,connfd;
+
 
   if (argc != 2) {
     fprintf(stderr,"usage: %s <IPaddress>\n",argv[0]);
@@ -234,8 +243,9 @@ int main(int argc, char **argv)
 while(1){
 
   if(IN_PAUSE==0){
+  pthread_mutex_lock(&mutex_choice);
   printf("PREMI 1 PER COLLEGARTI E 2 per la lista\n" );
-  scanf("%d",&k);//QUESTA SCANF MI IMPALLA TUTTO PERCHE QUANDO ESCE IL MESSAGTGIO ACCETTA O RIFIIUTA, SE PREMI 2 TI STAMPA I PEER; ALTRA RIGO 171
+  scanf("%d",&k);
   if(k==1){
         fflush(stdin);
         pthread_create(&thread_action,NULL,peerConnect,NULL);
@@ -248,6 +258,7 @@ while(1){
       Pproto.flag=1;
     }
   }
+  pthread_mutex_unlock(&mutex_choice);
   sleep(2);
 
 }

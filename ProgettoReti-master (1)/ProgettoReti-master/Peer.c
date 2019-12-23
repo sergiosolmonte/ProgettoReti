@@ -12,6 +12,8 @@
 #include <sys/select.h>
 
 #include "hash.h"
+
+#define SIGKILL 9
 /*
 
   LE SCANF FUNZIONANO, IL PROBLEMA ORA È CHE SICCOME PRIMA DELLA SCANF DEL MAIN, SUBITO DOPO IL WHILE, C'È IL LOCK DEL MUTEX,
@@ -37,7 +39,7 @@ struct Transaction{
 };
 
 void * trackerConnect(void *);
-pthread_t thread_peer, thread_action,thread_receive;
+pthread_t thread_peer, thread_action,thread_receive, thread_menu;
 
 pthread_mutex_t mutex_peer = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_choice= PTHREAD_MUTEX_INITIALIZER;
@@ -46,7 +48,7 @@ pthread_mutex_t mutex_choice= PTHREAD_MUTEX_INITIALIZER;
 
 int sockudp, n, nwrite, nread,i,socktcp, size_peer,listenfd,connfd;
 struct Transaction reachedPeer[5];
-int IN_PAUSE;
+int IN_PAUSE,key;
 char recvline[1025];
 char recvline2[1025];
 struct sockaddr_in servaddr,peer_list[10];
@@ -55,7 +57,7 @@ struct ping_protocol Pproto,ArrayPeers[10];
 
 
 
-void * trackerConnect(void * arg){
+void *trackerConnect(void * arg){
 
   while(1){
 
@@ -94,7 +96,7 @@ void * trackerConnect(void * arg){
 }
 
 
-void * peerConnect(void* arg){
+void *peerConnect(void* arg){
 
 
     int porta;
@@ -171,6 +173,8 @@ void *openPort(void* arg){
          exit(1);
       }
         printf("C'È UN TENTATIVO DI CONNESSIONE !!\n");
+        //pthread_kill(thread_menu,SIGKILL);
+        pthread_cancel(thread_menu);
         pthread_mutex_lock(&mutex_choice);
 
         IN_PAUSE=1;
@@ -203,6 +207,25 @@ void *openPort(void* arg){
     exit(0);
 }
 
+void *menu_exec(void* arg){
+
+
+  printf("PREMI 1 PER COLLEGARTI E 2 per la lista\n" );
+  scanf("%d",&key);
+  if(key==1){
+        fflush(stdin);
+        pthread_create(&thread_action,NULL,peerConnect,NULL);
+        pthread_join(thread_action,NULL);
+
+  }else if (key==2){
+
+      fflush(stdin);
+      printf("Ecco la lista dei peer\n");
+      Pproto.flag=1;
+    }
+
+return 0;
+}
 int main(int argc, char **argv)
 {
 
@@ -238,26 +261,21 @@ int main(int argc, char **argv)
   pthread_create(&thread_peer,NULL,trackerConnect,NULL);
   pthread_create(&thread_receive,NULL,openPort,NULL);
 
-  int k;
+  //int k;
 
 while(1){
 
+    /*
   if(IN_PAUSE==0){
   pthread_mutex_lock(&mutex_choice);
-  printf("PREMI 1 PER COLLEGARTI E 2 per la lista\n" );
-  scanf("%d",&k);
-  if(k==1){
-        fflush(stdin);
-        pthread_create(&thread_action,NULL,peerConnect,NULL);
-        pthread_join(thread_action,NULL);
 
-  }else if (k==2){
-
-      fflush(stdin);
-      printf("Ecco la lista dei peer\n");
-      Pproto.flag=1;
-    }
   }
+  pthread_mutex_unlock(&mutex_choice);
+
+*/
+  pthread_mutex_lock(&mutex_choice);
+  pthread_create(&thread_menu,NULL,menu_exec,NULL);
+  pthread_join(thread_menu,NULL);
   pthread_mutex_unlock(&mutex_choice);
   sleep(2);
 

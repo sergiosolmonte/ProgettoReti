@@ -4,3 +4,6 @@ Bisognerebbe fare la stessa cosa per il peer che accetta la richiesta, creando u
 Il prossimo passo poi è quello di far comunicare due peer sullo state channel e permettergli di scambiarsi il denaro.
 
 Non so se ho tempo oggi quindi inizio a caricare quello che ho fatto.
+
+Prova a fare il pull da atom cosi vediamo se funziona.
+

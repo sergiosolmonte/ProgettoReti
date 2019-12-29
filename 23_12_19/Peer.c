@@ -38,7 +38,7 @@ pthread_mutex_t mutex_choice= PTHREAD_MUTEX_INITIALIZER;
 int indexC = 0;
 int Saldo = 100;
 struct Transaction channels[10];
-int sockudp, n, nwrite, nread,i,socktcp, size_peer,listenfd,connfd;
+int sockudp, n, nwrite, nread,i,socktcp, size_peer,listenfd,connfd,max_fd;
 struct Transaction reachedPeer[5];
 int IN_PAUSE,key;
 char recvline[1025];
@@ -120,8 +120,8 @@ void *peerConnect(void* arg){
       perror("connect\n");
       pthread_mutex_unlock(&mutex_peer);
     }
-
-    snprintf(recvline,sizeof(recvline),"Ciao sono il peer %c e vorrei connettermi\n", Pproto.name);
+                                                                                  //HO USATO ALT COME MONETA IN ONORE DEL MAGICO
+    snprintf(recvline,sizeof(recvline),"Ciao sono il peer %c e vorrei connettermi con %d ALT\n", Pproto.name,amount);
     int lung;
     lung=strlen(recvline);
     write(socktcp,&lung,sizeof(int));
@@ -142,12 +142,16 @@ void *peerConnect(void* arg){
         write(socktcp,recvline,strlen(recvline));
         read(socktcp,&idPeerConn,sizeof(int));
         //Inserire il peer nella propria lista dei peer
+        if(indexC<5){
+
         channels[indexC].fd = socktcp;
         channels[indexC].id = idPeerConn;
         channels[indexC].port   = porta;
         channels[indexC].stateP = amount;
+
         printf(" FD = %d\n ID = %c\n PORTA = %d\n STATO = %d\n",channels[indexC].fd,channels[indexC].id,channels[indexC].port,channels[indexC].stateP);
         indexC++;
+        }
 
         }
         pthread_mutex_unlock(&mutex_peer);
@@ -176,6 +180,11 @@ void *openPort(void* arg){
     perror("listen");
     exit(1);
   }
+
+  max_fd = list_fd;
+	fdInt[max_fd] = 1;
+
+  
   while(1){
       if ( ( connfd = accept(listenfd, (struct sockaddr *) NULL, NULL) ) < 0 ) {
          perror("accept");
@@ -239,6 +248,10 @@ void *menu_exec(void* arg){
 
 return 0;
 }
+
+
+
+
 int main(int argc, char **argv)
 {
 

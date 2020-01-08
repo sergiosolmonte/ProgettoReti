@@ -36,11 +36,13 @@ int fdApp;
 
 pthread_mutex_t mutex_peer = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_choice = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_pong = PTHREAD_MUTEX_INITIALIZER;
 // pthread_mutex_init(&mutex_peer,NULL);
 int indexC = 0;
 int Saldo = 100;
 struct Transaction channels[10];
-int sockudp, n, nwrite, nread, i, socktcp, size_peer, listenfd, connfd;
+int sockudp, n, nwrite, nread, i, socktcp, listenfd, connfd;
+int size_peer;
 // struct Transaction reachedPeer[5];
 int IN_PAUSE, key;
 char recvline[1025];
@@ -120,8 +122,7 @@ void *trackerConnect(void *arg) {
 
     pthread_mutex_lock(&mutex_peer);
 
-    sendto(sockudp, &Pproto, sizeof(struct ping_protocol), 0,
-           (struct sockaddr *)&servaddr, sizeof(servaddr));
+    sendto(sockudp, &Pproto, sizeof(struct ping_protocol), 0,(struct sockaddr *)&servaddr, sizeof(servaddr));
 
     //  printf("ENTRO NEL THREAD\n");
     if (Pproto.lastPing == 0) {
@@ -129,30 +130,42 @@ void *trackerConnect(void *arg) {
       printf("MANDO SEGNALE AL TRACKER\n");
       recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
       printf("RICEVUTO clock aggiornato\n");
+
     } else if (Pproto.flag == 1) {
       /* Richiesta lista peer disponibili*/
       //  sendto(sockudp, &Pproto, sizeof(struct ping_protocol), 0, (struct
       //  sockaddr *) &servaddr, sizeof(servaddr));
-      recvfrom(sockudp, &size_peer, sizeof(int), 0, NULL,
-               NULL); // riceve prima il size della lista
-      recvfrom(sockudp, &ArrayPeers, sizeof(ArrayPeers), 0, NULL,
-               NULL); // e poi i peer
+      pthread_mutex_lock(&mutex_pong);
+
+      size_peer=0;
+      recvfrom(sockudp, &size_peer, sizeof(int), 0, NULL,NULL);
+      printf(" SIZE PEER= %d \n",size_peer); // riceve prima il size della lista
+      recvfrom(sockudp, &ArrayPeers, size_peer*sizeof(ArrayPeers), 0, NULL, NULL); // e poi i peer
       printf("ricevo porte TRACKER\n");
       printf("LISTA PEERS\n");
-      for (i = 0; i < size_peer; i++) {
-        if (ArrayPeers[i].flag == 4) { // se il peer e' morto
+
+      int p;
+      for (p = 0; p < size_peer; p++) {
+        if (ArrayPeers[p].flag == 4) { // se il peer e' morto
           continue;
         } else // se il peer e' attivo
         {
-          printf("NOME = %c PORTA = %d\n", ArrayPeers[i].name,
-                 ArrayPeers[i].rec_port);
+          printf("NOME = %c PORTA = %d\n", ArrayPeers[p].name,
+                 ArrayPeers[p].rec_port);
         }
       }
-      Pproto.flag = 0;
-    } else // flag=0 cioè ping
-    {
+        Pproto.flag = 0;
+        pthread_mutex_unlock(&mutex_pong);
 
+    }
+    else // flag=0 cioè ping
+    {
+      pthread_mutex_lock(&mutex_pong);
+
+      sendto(sockudp, &Pproto, sizeof(struct ping_protocol), 0, (struct sockaddr *) &servaddr, sizeof(servaddr));
       recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
+      pthread_mutex_unlock(&mutex_pong);
+      
     }
     pthread_mutex_unlock(&mutex_peer);
     sleep(2);
@@ -293,6 +306,7 @@ void *menu_exec(void *arg) {
     break;
   case 2:
     fflush(stdin);
+
     printf("Ecco la lista dei peer\n");
     Pproto.flag = 1;
     break;
@@ -355,11 +369,14 @@ void sendMoney(void *arg){
   int x,fdX,sendALT=0; //x e' la porta, fdX e' il suo valore hash associato
 nell'array channels scanf("%d",&x); fdX=hashcode(x);
   if(FD_ISSET(fdX,&fset)){//CONTROLLO SE E' ANCORA ATTIVA LA CONNESSIONE
+
     write(fdX,1,sizeof(int)); //invio codice per identficare la richiesta
 d'invio denaro
+
     printf("Quanto vuoi inviare? Max:%d\n",channels[fdX].stateP );
     scanf("%d\n",&sendALT);
     if(sendALT>channels[fdX].stateP){
+
     }
     write(fdX,&sendALT,sizeof(int));
   }

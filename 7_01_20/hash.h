@@ -29,8 +29,8 @@ int hashSearch(int k){
 //	int i=0;
 //while (array[index].key != k) {
 		int index = hashcode(k);
-		if (array[index].value == 0)
-			return index;
+		if (array[index].key == k)
+			return array[index].value;
 		//i++;
 	//}
 
@@ -76,27 +76,28 @@ void init_array()
 	for (i = 0; i < capacity; i++)
         {
 		array[i].key = 0;
-		array[i].value = 0;
+		array[i].value = -1;
 	}
 }
 
 /* to insert a key in the hash table */
-void insert(int key)
+void insert(int key,int j)
 {
 	int index = hashcode(key);
-	if (array[index].value == 0)
+	if (array[index].value == -1)
         {
 		/*  key not present, insert it  */
 		array[index].key = key;
-		array[index].value = 1;
+		array[index].value = j;
 		size++;
 		printf("\n Key (%d) has been inserted \n", key);
 	}
 	else if(array[index].key == key)
         {
-		/*  updating already existing key  */
+		/*  updating already existing key
 		printf("\n Key (%d) already present, hence updating its value \n", key);
 		array[index].value += 1;
+		*/
 	}
 	else
         {
@@ -109,13 +110,13 @@ void insert(int key)
 void remove_element(int key)
 {
 	int index  = hashcode(key);
-	if(array[index].value == 0)
+	if(array[index].value == -1)
         {
 		printf("\n This key does not exist \n");
 	}
 	else {
 		array[index].key = 0;
-		array[index].value = 0;
+		array[index].value = -1;
 		size--;
 		printf("\n Key (%d) has been removed \n", key);
 	}
@@ -127,7 +128,7 @@ void display()
 	int i;
 	for (i = 0; i < capacity; i++)
         {
-		if (array[i].value == 0)
+		if (array[i].value == -1)
                 {
 		//	printf("\n Array[%d] has no elements \n",i);
 		}

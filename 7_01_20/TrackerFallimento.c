@@ -112,7 +112,7 @@ void *pinging(void *arg) {
         total_t = (double)(start - ArrayPeers[n].lastPing) ;
         // Se il peer non è attivo da 10 secondi viene eliminato
         //printf("\nTempo start= %ld Tempo totale= %ld Tempo peer = %ld\n",start,total_t,ArrayPeers[n].lastPing);
-        if (total_t > 100000) {
+        if (total_t > 2000) {
           ArrayPeers[n].name = ' ';
           ArrayPeers[n].rec_port = 9999;
           ArrayPeers[n].flag = 4;

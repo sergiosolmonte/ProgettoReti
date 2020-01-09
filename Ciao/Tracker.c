@@ -24,7 +24,8 @@ struct ping_protocol {
 pthread_mutex_t mutex_peer;
 void *insert_peers(void *);
 void *pinging(void *);
-struct ping_protocol Peer, ArrayPeers[10];
+struct ping_protocol Peer;
+struct ping_protocol *ArrayPeers;
 pthread_t thread_control, thread_ping;
 
 int sock, n, control, sock;
@@ -54,7 +55,7 @@ void *insert_peers(void *arg) {
 
     // printf("Richiesta Ricevuta\n");
     if (Peer.lastPing == 0) {
-      printf("\n Received packet from %s:%d\n I=%d \n\n",inet_ntoa(in.sin_addr), ntohs(in.sin_port), i);
+      printf("\n Received packet from %s:%d\n \n",inet_ntoa(in.sin_addr), ntohs(in.sin_port));
       /*
           BISOGNA INSERIRE GLI ELEMENTI NELL'HASH IN MODO TALE DA CAMBIARE IL
          PNG EFFETTIVO E NON SOLO QUELLO DA RESTITUIRE NEL ArrayPeers
@@ -96,11 +97,23 @@ void *insert_peers(void *arg) {
       start = clock();
       //Peer.lastPing = start;
     //  ArrayPeers[hashSearch(Peer.rec_port)].lastPing=start;
+      //i=getCapacity();
       changeValue(Peer.rec_port,start);
+      free(ArrayPeers);
+      ArrayPeers=(struct ping_protocol *)malloc(1 * sizeof(struct ping_protocol));
       printf("Tempo peer richiedente: %ld\n",  array[hashSearch(Peer.rec_port)].endPing);
       sendto(sock, &i, sizeof(int), 0, (struct sockaddr *)&in, len);
+      int n;
+      int k=0;
+      for(n=0;n<getCapacity();n++){
+          if(array[n].key>0){
+            ArrayPeers[k].rec_port=array[n].key;ArrayPeers[k].lastPing=array[n].endPing;
+            k++;
+          }
+      }
     //  display();
-      sendto(sock, &ArrayPeers, sizeof(ArrayPeers), 0, (struct sockaddr *)&in, len);
+      sendto(sock, ArrayPeers, i*sizeof(struct ping_protocol), 0, (struct sockaddr *)&in, len);
+      //free(ArrayPeers);
       pthread_mutex_unlock(&mutex_ping);
     }
   }
@@ -108,37 +121,31 @@ void *insert_peers(void *arg) {
 
 void *pinging(void *arg) {
 
-  //while (1) {
-    for (int n = 0; n < i; n++) {
+    for (int n = 0; n < getCapacity(); n++) {
 
-      if (ArrayPeers[n].flag == 4) {
+      if (array[n].key<1) {
 
         continue;
 
       } else {
           //start=clock();
-        total_t = (double)(start - ArrayPeers[n].lastPing) ;
+        total_t = (double)(start - array[n].endPing) ;
         // Se il peer non è attivo da 10 secondi viene eliminato
         //printf("\nTempo start= %ld Tempo totale= %ld Tempo peer = %ld\n",start,total_t,ArrayPeers[n].lastPing);
         if (total_t > 2000) {
-          ArrayPeers[n].name = ' ';
-          ArrayPeers[n].rec_port = 9999;
-          ArrayPeers[n].flag = 4;
-        //  remove_element(ArrayPeers[n].rec_port);
+          remove_element(array[n].key);
           i--;
         }
       }
     }
-  //}
-
-
   return 0;
 }
 
 int main(int argc, char **argv) {
-
+ArrayPeers=(struct ping_protocol *)malloc(1 * sizeof(struct ping_protocol));
   init_array();
   start = clock();
+  //i=getCapacity();
   // pthread_mutex_init (&mutex_peer, NULL);
 
   //  fd_set fset;

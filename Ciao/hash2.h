@@ -23,7 +23,8 @@ int h2(int k) {
 }
 /* this function gives a unique hash code to the given key */
 int hashcode(int key, int i) {
-		
+	int X =  ( (h1(key) + (i*h2(key)) ) % capacity);
+	printf("%d LOL\n",X);
 	return ( (h1(key) + (i*h2(key)) ) % capacity);
 }
 

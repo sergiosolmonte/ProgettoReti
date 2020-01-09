@@ -11,7 +11,6 @@
 #include <time.h>
 #include <unistd.h> /* include unix standard library */
 
-#include "hash.h"
 
 #define SIGKILL 9
 
@@ -36,6 +35,8 @@ int fdApp;
 
 pthread_mutex_t mutex_peer = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_choice = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_channel = PTHREAD_MUTEX_INITIALIZER;
+
 // pthread_mutex_init(&mutex_peer,NULL);
 int indexC = 0;
 int Saldo = 100;
@@ -47,9 +48,12 @@ char recvline[1025];
 char recvline2[1025];
 struct sockaddr_in servaddr, peer_list[10];
 int control = 1, port;
-struct ping_protocol Pproto, ArrayPeers[10];
+struct ping_protocol Pproto;
+struct ping_protocol *ArrayPeers;
 fd_set fset;
 void printChannelsList();
+//struct data *array;
+
 //void sendMoney(void *);
 /*=========================================================
 Ho aggiunto la memorizzazione dei peer con cui si è stabilita
@@ -94,7 +98,6 @@ void *peer_set(void *arg) {
     write(fd, &Pproto.name, sizeof(char));
     printf("%s \n", recvline2);
 
-    // Sostituire Channels da Array a Hash Table
     channels[indexC].fd = fd;
     char patetID;
     read(fd, &patetID, sizeof(char)); // ricevo ID interlocutore
@@ -124,7 +127,7 @@ void *trackerConnect(void *arg) {
 
   while (1) {
 
-    pthread_mutex_lock(&mutex_peer);
+    //pthread_mutex_lock(&mutex_peer);
 
     sendto(sockudp, &Pproto, sizeof(struct ping_protocol), 0,
            (struct sockaddr *)&servaddr, sizeof(servaddr));
@@ -141,26 +144,35 @@ void *trackerConnect(void *arg) {
       //  sockaddr *) &servaddr, sizeof(servaddr));
       recvfrom(sockudp, &size_peer, sizeof(int), 0, NULL,
                NULL); // riceve prima il size della lista
-      recvfrom(sockudp, &ArrayPeers, sizeof(ArrayPeers), 0, NULL,
-               NULL); // e poi i peer
+               printf("SIZEPEER=: %d\n",size_peer);
+
+               free(ArrayPeers);
+      ArrayPeers=(struct ping_protocol*)malloc(size_peer * sizeof(struct ping_protocol));
+
+      recvfrom(sockudp, ArrayPeers, size_peer*sizeof(struct ping_protocol), 0, NULL,
+               NULL); // e poi i peer  direttamente dalla hash conenuta nel traker che essendo già un puntatore ad una struct
+               //non necessita di un indirizzamento
+
       printf("ricevo porte TRACKER\n");
       printf("LISTA PEERS\n");
+
       for (i = 0; i < size_peer; i++) {
-        if (ArrayPeers[i].flag == 4) { // se il peer e' morto
-          continue;
-        } else // se il peer e' attivo
-        {
-          printf("NOME = %c PORTA = %d\n", ArrayPeers[i].name,
-                 ArrayPeers[i].rec_port);
+
+          printf("Porta= %d Ping = %ld\n", ArrayPeers[i].rec_port,
+                 ArrayPeers[i].lastPing);
         }
-      }
-      Pproto.flag = 0;
+        Pproto.flag = 0;
+        free(ArrayPeers);
+
+
+      //display();
+
     } else // flag=0 cioè ping
     {
 
       recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
     }
-    pthread_mutex_unlock(&mutex_peer);
+    //pthread_mutex_unlock(&mutex_peer);
     sleep(2);
   }
   return 0;
@@ -278,14 +290,27 @@ void *openPort(void *arg) {
 }
 void *channelConnect(void *arg){
 
+    pthread_cancel(thread_menu);
+    pthread_mutex_lock(&mutex_channel);
+    char keyC, scelta;
 
+    fflush(stdin);
+    printChannelsList();
+    printf("Vuoi connetterti ad uno state channel? [s/n]\n");
+    scanf("%c",&keyC);
+    if(keyC == 's'){
+      printf("Inserisci l'ID del peer al quale vuoi connetterti");
+      scanf("%c",&scelta);
+      char *ptr = &scelta;
+    }
+    pthread_mutex_unlock(&mutex_channel);
+    return 0;
 }
 void *menu_exec(void *arg) {
 
-  char keyC, scelta;
   printf("PREMI 1 PER COLLEGARTI E 2 per la lista ");
   if(indexC>0)
-    printf(" o premi 3 per visualizzare gli state channels")
+    printf(" o premi 3 per visualizzare gli state channels");
 
   printf("\n");
   scanf("%d", &key);
@@ -302,23 +327,15 @@ void *menu_exec(void *arg) {
     break;
   case 3:
     fflush(stdin);
-    printStateChannels();
-    printf("Vuoi connetterti ad uno state channel? [s/n]\n");
-    scanf("%c",&keyC);
-    if(keyC == 's'){
-      printf("Inserisci l'ID del peer al quale vuoi connetterti");
-      scanf("%c",&scelta);
-      pthread_create(&thread_channel, NULL, channelConnect, NULL);
-      pthread_join(thread_channel, NULL);
-    }
-    else if(keyC == 'n')
-      return;
+    pthread_create(&thread_channel, NULL, channelConnect, NULL);
+    pthread_join(thread_channel, NULL);
+    break;
   }
   return 0;
 }
 
 int main(int argc, char **argv) {
-
+  ArrayPeers=(struct ping_protocol *)malloc(1 * sizeof(struct ping_protocol));
   char sendbuff[4096], recvbuff[4096];
 
   if (argc != 2) {
@@ -343,6 +360,9 @@ int main(int argc, char **argv) {
   scanf("%d", &Pproto.rec_port);
   Pproto.lastPing = 0;
   Pproto.flag = 0;
+  //init_array();
+  //printf("DISPLAY:\n" );
+  //display();
 
   pthread_create(&thread_peer, NULL, trackerConnect, NULL);
   pthread_create(&thread_receive, NULL, openPort, NULL);
@@ -352,7 +372,9 @@ int main(int argc, char **argv) {
     pthread_mutex_lock(&mutex_choice);
     pthread_create(&thread_menu, NULL, menu_exec, NULL);
     pthread_join(thread_menu, NULL);
+    pthread_mutex_lock(&mutex_channel);
     pthread_mutex_unlock(&mutex_choice);
+    pthread_mutex_unlock(&mutex_channel);
     sleep(2);
   }
   pthread_join(thread_receive, NULL);

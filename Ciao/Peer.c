@@ -29,6 +29,7 @@ struct Transaction {
 };
 
 void *trackerConnect(void *);
+void *channelConnect(void *);
 void* menu_exec(void *);
 pthread_t thread_peer, thread_action, thread_receive, thread_menu, thread_set, thread_channel;
 
@@ -177,6 +178,7 @@ void *peerConnect(void *arg) {
   int amount;
   in_port_t porta_request;
   struct sockaddr_in toPeer;
+  TRANSACTION* app4;
   int connfd;
 
   if ((socktcp = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -186,6 +188,19 @@ void *peerConnect(void *arg) {
 
   printf("Inserisci la porta del peer al quale vuoi connetterti\n");
   scanf("%d", &porta);
+
+  app4=searchChannel(porta);
+  printf("DOPO SEARCH\n");
+
+  if(app4!=NULL){
+
+    pthread_create(&thread_channel, NULL, channelConnect, &porta);
+    pthread_join(thread_channel, NULL);
+    printf("JOIN CHANNEL CONNECT\n");
+
+
+  }else{
+
   printf("Quanto vuoi impegnare? (amount>0)\n");
   scanf("%d", &amount);
 
@@ -240,6 +255,7 @@ void *peerConnect(void *arg) {
       indexC++;
     }
   }
+}
   printf("UNLOCK IN PEER_CONNECT\n");
   pthread_mutex_unlock(&mutex_choice);
   return 0;
@@ -286,20 +302,28 @@ void *openPort(void *arg) {
 }
 void *channelConnect(void *arg){
 
-    char keyC;
-    int portascelta;
-    fflush(stdin);
-  //printChannelsList();
-    printChannels();
-    printf("Vuoi connetterti ad uno state channel? [s/n]\n");
+    char keyC,keyC2;
+    int *portascelta=(int *)arg;
+    //fflush(stdin);
+    //printChannels();
+    //printf("Vuoi connetterti ad uno state channel? [y/n]\n");
+
+
+    printf("VUOI INVIARE ALT? y/n\n" );
     fflush(stdin);
     scanf("%s",&keyC);
-    printf("Carattere: %c\n",keyC);
 
-    if(keyC == 's'){
-      fflush(stdin);
-      printf("Inserisci la porta del peer al quale vuoi connetterti\n");
-      scanf("%d",&portascelta);
+
+      if(keyC == 'y'){
+          TRANSACTION *app3=searchChannel(*portascelta);
+              if(app3!=NULL){
+
+                    printf("SALDO SU CANALE = %d ALT \n",app3->stateP );
+
+              }
+
+
+
     }else{
       printf("Afammocc\n");
     }
@@ -331,9 +355,8 @@ void* menu_exec(void *arg) {
     break;
   case 3:
     fflush(stdin);
-    pthread_create(&thread_channel, NULL, channelConnect, NULL);
-    pthread_join(thread_channel, NULL);
-    printf("JOIN CHANNEL CONNECT\n");
+    printChannels();
+    pthread_mutex_unlock(&mutex_choice);
     break;
   }
 
@@ -388,20 +411,22 @@ int main(int argc, char **argv) {
 
   exit(0);
 }
+
 /*
-void sendMoney(void *arg){
+void sendMoney(){
+
   printf("A quale peer vuoi inviare denaro?(inserisci porta)\n");
-  printPeerListpeerList();
-  int x,fdX,sendALT=0; //x e' la porta, fdX e' il suo valore hash associato
-nell'array channels scanf("%d",&x); fdX=hashcode(x);
+
+  int x,fdX,sendALT=0; //x e' la porta, fdX e' il suo valore hash associat nell'array channels scanf("%d",&x); fdX=hashcode(x);
+
   if(FD_ISSET(fdX,&fset)){//CONTROLLO SE E' ANCORA ATTIVA LA CONNESSIONE
-    write(fdX,1,sizeof(int)); //invio codice per identficare la richiesta
-d'invio denaro
+    write(fdX,1,sizeof(int)); //invio codice per identficare la richiesta d'invio denaro
     printf("Quanto vuoi inviare? Max:%d\n",channels[fdX].stateP );
     scanf("%d\n",&sendALT);
     if(sendALT>channels[fdX].stateP){
     }
     write(fdX,&sendALT,sizeof(int));
   }
+
 }
 */

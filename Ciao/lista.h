@@ -19,6 +19,9 @@ TRANSACTION initChannel(){
   channels=(TRANSACTION*)malloc(1*sizeof(TRANSACTION));
   channels->pnext=NULL;
   channels->pprec=NULL;
+  channels->port=-1;
+  channels->fd=-1;
+
 }
 
 void insertChannel(TRANSACTION ins){
@@ -41,7 +44,7 @@ void insertChannel(TRANSACTION ins){
 void DELchannels(int portaDEL){ //portaDEL e' la porta del channels da eliminare
   TRANSACTION *ptr,*prec,*succ;
   ptr=channels;
-  while(ptr->port!=portaDEL || ptr->pnext!=NULL){ //vado avanti fino a che non trovo la chiave o non mi trovo alla fine della lista
+  while(ptr->port!=portaDEL && ptr->pnext!=NULL){ //vado avanti fino a che non trovo la chiave o non mi trovo alla fine della lista
     ptr=ptr->pnext;
   }
   if(ptr->port!=portaDEL){ //controllo se sono arrivato alla fine della lista e non ho trovato la chiave
@@ -67,6 +70,22 @@ void DELchannels(int portaDEL){ //portaDEL e' la porta del channels da eliminare
     }
 
 
+  }
+}
+
+TRANSACTION* searchChannel(int portaKEY){
+  TRANSACTION *ptr=channels;
+  printf("SONO INIZIALIZZATO \n");
+  while ((ptr->port!=portaKEY) && (ptr->pnext!=NULL)){
+    ptr=ptr->pnext;
+  }
+  printf("PORTA LOL %d\n",ptr->port);
+  if (ptr->port!=portaKEY){ //controllo se sono arrivato alla fine della lista e non ho trovato la chiave
+    printf("Porta non trovata\n");
+    return NULL;
+  }
+  else{
+    return ptr;
   }
 }
 

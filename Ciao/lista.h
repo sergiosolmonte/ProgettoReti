@@ -64,7 +64,7 @@ void cancchannels(int portaDEL){ //portaDEL e' la porta del channels da eliminar
       succ->pprec=prec;//facendo saltare quello eliminato
       free(ptr);
     }
-    prec=ptr->pprec;
+
 
   }
 }

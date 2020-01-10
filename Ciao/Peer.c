@@ -29,6 +29,7 @@ struct Transaction {
 };
 
 void *trackerConnect(void *);
+void* menu_exec(void *);
 pthread_t thread_peer, thread_action, thread_receive, thread_menu, thread_set, thread_channel;
 
 int fdApp;
@@ -77,7 +78,7 @@ void *peer_set(void *arg) {
 
   int fd = fdApp;
 
-  pthread_cancel(thread_menu);
+ pthread_cancel(thread_menu);
   pthread_mutex_lock(&mutex_choice);
   read(fd, &lungh, sizeof(int));
   read(fd, recvline2, lungh * sizeof(char));
@@ -252,7 +253,7 @@ void *peerConnect(void *arg) {
 }
 void *openPort(void *arg) {
 
-  int choice, max_fd;
+  int choice;
 
   if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
     perror("socket");
@@ -273,40 +274,50 @@ void *openPort(void *arg) {
     exit(1);
   }
 
-  max_fd = listenfd;
-
   while (1) {
 
-    if ((connfd = accept(listenfd, (struct sockaddr *)NULL, NULL)) < 0) {
+    int connectfd;
+
+    if ((connectfd = accept(listenfd, (struct sockaddr *)NULL, NULL)) < 0) {
       perror("accept");
       exit(1);
     }
     printf("C'È UN TENTATIVO DI CONNESSIONE !!\n");
-    fdApp = connfd;
+    //abort(menu_exec);
+    fdApp = connectfd;
     pthread_create(&thread_set, NULL, peer_set, NULL);
+    pthread_join(thread_set, NULL);
   }
-  pthread_join(thread_set, NULL);
+
   exit(0);
 }
 void *channelConnect(void *arg){
 
-    pthread_cancel(thread_menu);
-    pthread_mutex_lock(&mutex_channel);
+    //pthread_cancel(thread_menu);
+    //pthread_mutex_lock(&mutex_choice);
     char keyC, scelta;
 
     fflush(stdin);
     printChannelsList();
     printf("Vuoi connetterti ad uno state channel? [s/n]\n");
     scanf("%c",&keyC);
+
     if(keyC == 's'){
-      printf("Inserisci l'ID del peer al quale vuoi connetterti");
-      scanf("%c",&scelta);
-      char *ptr = &scelta;
+      printf("Inserisci l'ID del peer al quale vuoi connetterti\n");
+      scanf("  %c  ",&scelta);
+
+      //pthread_mutex_unlock(&mutex_choice);
+      return 0;
+    }else{
+        //pthread_mutex_unlock(&mutex_choice);
+        return 0;
     }
-    pthread_mutex_unlock(&mutex_channel);
-    return 0;
+
+    //return 0;
 }
-void *menu_exec(void *arg) {
+void* menu_exec(void *arg) {
+
+  //pthread_cancel(thread_menu)
 
   printf("PREMI 1 PER COLLEGARTI E 2 per la lista ");
   if(indexC>0)
@@ -327,10 +338,14 @@ void *menu_exec(void *arg) {
     break;
   case 3:
     fflush(stdin);
+      //pthread_mutex_lock(&mutex_choice);
     pthread_create(&thread_channel, NULL, channelConnect, NULL);
     pthread_join(thread_channel, NULL);
+      //pthread_mutex_unlock(&mutex_channel);
     break;
   }
+
+
   return 0;
 }
 
@@ -367,14 +382,18 @@ int main(int argc, char **argv) {
   pthread_create(&thread_peer, NULL, trackerConnect, NULL);
   pthread_create(&thread_receive, NULL, openPort, NULL);
 
+
   while (1) {
 
+
+    //menu_exec();
     pthread_mutex_lock(&mutex_choice);
     pthread_create(&thread_menu, NULL, menu_exec, NULL);
     pthread_join(thread_menu, NULL);
-    pthread_mutex_lock(&mutex_channel);
+    //pthread_mutex_lock(&mutex_channel);
     pthread_mutex_unlock(&mutex_choice);
-    pthread_mutex_unlock(&mutex_channel);
+  //  pthread_mutex_unlock(&mutex_channel);
+    printf("Fottuta sleep!\n");
     sleep(2);
   }
   pthread_join(thread_receive, NULL);

@@ -13,7 +13,7 @@ struct transaction{
 
 typedef struct transaction TRANSACTION;
 TRANSACTION *channels; // creo channels nella h che e' anche la testa della lista
-
+int channelSize=0;
 
 TRANSACTION initChannel(){
   channels=(TRANSACTION*)malloc(1*sizeof(TRANSACTION));
@@ -22,29 +22,30 @@ TRANSACTION initChannel(){
 }
 
 void insertChannel(TRANSACTION ins){
+  channelSize++;
   TRANSACTION *ptr=channels;
-  while(ptr->p_next!=NULL){
-    ptr=ptr->p_next;
+  while(ptr->pnext!=NULL){
+    ptr=ptr->pnext;
   }
-  TRANSACTION nuovo=(TRANSACTION*)malloc(1*sizeof(TRANSACTION));
-  nuovo->fd=ins->d;
-  nuovo->id=ins->id;
-  nuovo->port=ins->port;
-  nuovo->stateP=ins->stateP;
-  ptr->p_next=nuovo;
+  TRANSACTION *nuovo=(TRANSACTION*)malloc(1*sizeof(TRANSACTION));
+  nuovo->fd=ins.fd;
+  nuovo->id=ins.id;
+  nuovo->port=ins.port;
+  nuovo->stateP=ins.stateP;
+  ptr->pnext=nuovo;
   nuovo->pprec=ptr;
   nuovo->pnext=NULL;
 
 }
 
-void cancchannels(int portaDEL){ //portaDEL e' la porta del channels da eliminare
+void DELchannels(int portaDEL){ //portaDEL e' la porta del channels da eliminare
   TRANSACTION *ptr,*prec,*succ;
   ptr=channels;
   while(ptr->port!=portaDEL || ptr->pnext!=NULL){ //vado avanti fino a che non trovo la chiave o non mi trovo alla fine della lista
     ptr=ptr->pnext;
   }
   if(ptr->port!=portaDEL){ //controllo se sono arrivato alla fine della lista e non ho trovato la chiave
-    printf("Porta non trovata\n", );
+    printf("Porta non trovata\n");
   }
   else{
     if(ptr->pprec==NULL){//se mi trovo in testa
@@ -67,4 +68,20 @@ void cancchannels(int portaDEL){ //portaDEL e' la porta del channels da eliminar
 
 
   }
+}
+
+void  printNode(TRANSACTION **el) {
+  printf("FD=%d\nID=%c\nPORTA=%d\nSTATO=%d\n",(*el)->fd,(*el)->id,(*el)->port,(*el)->stateP );
+}
+
+void printChannels(){
+  int i;
+  TRANSACTION *ptr=channels->pnext;
+  for(i=0;i<channelSize;i++){
+
+    printNode(&ptr);
+    ptr=ptr->pnext;
+
+  }
+
 }

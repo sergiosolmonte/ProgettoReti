@@ -11,7 +11,7 @@
 #include <time.h>
 #include <unistd.h> /* include unix standard library */
 
-
+#include "lista.h"
 #define SIGKILL 9
 
 struct ping_protocol {
@@ -35,13 +35,13 @@ pthread_t thread_peer, thread_action, thread_receive, thread_menu, thread_set, t
 int fdApp;
 
 pthread_mutex_t mutex_peer = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t mutex_choice = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_choice = PTHREAD_MUTEX_INITIALIZER;  //UTILIZZATO IN TUTTE LE FUNZIONI APPARTENENTI AL MENU PER SINCORNIZZARE L'ESECUZIONE DELLO STESSO
 pthread_mutex_t mutex_channel = PTHREAD_MUTEX_INITIALIZER;
 
-// pthread_mutex_init(&mutex_peer,NULL);
+
 int indexC = 0;
 int Saldo = 100;
-struct Transaction channels[5];
+//struct Transaction channels[5];
 int sockudp, n, nwrite, nread, i, socktcp, size_peer, listenfd, connfd;
 // struct Transaction reachedPeer[5];
 int IN_PAUSE, key;
@@ -52,8 +52,6 @@ int control = 1, port;
 struct ping_protocol Pproto;
 struct ping_protocol *ArrayPeers;
 fd_set fset;
-void printChannelsList();
-//struct data *array;
 
 //void sendMoney(void *);
 /*=========================================================
@@ -62,24 +60,17 @@ una connessione.
 ===========================================================*/
 
 // GESTIONE RICHIESTE DI CONNESSIONE IN ENTRATA
-void printChannelsList() {
-  int i;
-  for (i = 0; i < indexC && indexC != 0; i++)
-    printf(" FD = %d  ID = %c  PORTA = %d STATO = %d\n", channels[i].fd,
-           channels[i].id, channels[i].port, channels[i].stateP);
-}
+
 void *peer_set(void *arg) {
 
   IN_PAUSE = 1;
   int amount1;
   int lungh;
   int choice;
-  // int fd=(int)&arg;
 
   int fd = fdApp;
 
- pthread_cancel(thread_menu);
-  pthread_mutex_lock(&mutex_choice);
+  pthread_cancel(thread_menu);
   read(fd, &lungh, sizeof(int));
   read(fd, recvline2, lungh * sizeof(char));
   printf("%s \n", recvline2);
@@ -99,26 +90,26 @@ void *peer_set(void *arg) {
     write(fd, &Pproto.name, sizeof(char));
     printf("%s \n", recvline2);
 
-    channels[indexC].fd = fd;
-    char patetID;
-    read(fd, &patetID, sizeof(char)); // ricevo ID interlocutore
-    channels[indexC].id = patetID;
-    int portaLOL;
-    read(fd, &portaLOL, sizeof(int)); // ricevo porta interlocutore
-    channels[indexC].port = portaLOL;
-    channels[indexC].stateP = amount1; // salvo mio stato iniziale per il
-                                       // channel
 
-    printf(" FD = %d\n ID = %c\n PORTA = %d\n STATO = %d\n",
-           channels[indexC].fd, channels[indexC].id, channels[indexC].port,
-           channels[indexC].stateP);
+    TRANSACTION app2;
+    app2.fd = fd;
+    char id;
+    read(fd, &id, sizeof(char)); // ricevo ID interlocutore
+    app2.id = id;
+    int port;
+    read(fd, &port, sizeof(int)); // ricevo porta interlocutore
+    app2.port = port;
+    app2.stateP = amount1;
+    insertChannel(app2);
+    printChannels();
     indexC++;
+
   } else if (choice == 4) {
     write(connfd, &choice, sizeof(int));
     close(connfd);
     printf("Chiuso il canale\n");
   }
-
+  printf("UNLOCK IN PEER_SET\n");
   pthread_mutex_unlock(&mutex_choice);
   IN_PAUSE = 0;
 
@@ -163,6 +154,8 @@ void *trackerConnect(void *arg) {
                  ArrayPeers[i].lastPing);
         }
         Pproto.flag = 0;
+        printf("UNLOCK IN TRACKER CONNECT\n");
+        pthread_mutex_unlock(&mutex_choice);
         free(ArrayPeers);
 
 
@@ -191,7 +184,6 @@ void *peerConnect(void *arg) {
     exit(1);
   }
 
-  pthread_mutex_lock(&mutex_peer);
   printf("Inserisci la porta del peer al quale vuoi connetterti\n");
   scanf("%d", &porta);
   printf("Quanto vuoi impegnare? (amount>0)\n");
@@ -203,7 +195,6 @@ void *peerConnect(void *arg) {
 
   if (connect(socktcp, (struct sockaddr *)&toPeer, sizeof(toPeer)) < 0) {
     perror("connect\n");
-    pthread_mutex_unlock(&mutex_peer);
   }
 
   // HO USATO ALT COME MONETA IN ONORE DEL MAGICO
@@ -216,12 +207,13 @@ void *peerConnect(void *arg) {
   write(socktcp, &lung, sizeof(int));
   write(socktcp, recvline, strlen(recvline));
 
-  // Ora verifichiamo l'accettaziomne
+  // Ora verifichiamo l'accettazione
   int verify;
   char idPeerConn;
   read(socktcp, &verify, sizeof(int));
   if (verify == 4) {
     printf("IL PEER HA RIFIUTATO LA CONNESSIONE\n");
+
   } else if (verify == 3) {
     printf("CONNESSIONE ACCETTATA\n");
     if (amount <= Saldo)
@@ -237,18 +229,19 @@ void *peerConnect(void *arg) {
     // Inserire il peer nella propria lista dei peer
     if (indexC < 5) {
 
-      channels[indexC].fd = socktcp;
-      channels[indexC].id = idPeerConn;
-      channels[indexC].port = porta;
-      channels[indexC].stateP = amount;
+      TRANSACTION app;
+      app.fd = socktcp;
+      app.id = idPeerConn;
+      app.port = porta;
+      app.stateP = amount;
 
-      printf(" FD = %d\n ID = %c\n PORTA = %d\n STATO = %d\n",
-             channels[indexC].fd, channels[indexC].id, channels[indexC].port,
-             channels[indexC].stateP);
+      insertChannel(app);
+      printChannels();
       indexC++;
     }
   }
-  pthread_mutex_unlock(&mutex_peer);
+  printf("UNLOCK IN PEER_CONNECT\n");
+  pthread_mutex_unlock(&mutex_choice);
   return 0;
 }
 void *openPort(void *arg) {
@@ -293,31 +286,31 @@ void *openPort(void *arg) {
 }
 void *channelConnect(void *arg){
 
-    //pthread_cancel(thread_menu);
-    //pthread_mutex_lock(&mutex_choice);
-    char keyC, scelta;
-
+    char keyC;
+    int portascelta;
     fflush(stdin);
-    printChannelsList();
+  //printChannelsList();
+    printChannels();
     printf("Vuoi connetterti ad uno state channel? [s/n]\n");
-    scanf("%c",&keyC);
+    fflush(stdin);
+    scanf("%s",&keyC);
+    printf("Carattere: %c\n",keyC);
 
     if(keyC == 's'){
-      printf("Inserisci l'ID del peer al quale vuoi connetterti\n");
-      scanf("  %c  ",&scelta);
-
-      //pthread_mutex_unlock(&mutex_choice);
-      return 0;
+      fflush(stdin);
+      printf("Inserisci la porta del peer al quale vuoi connetterti\n");
+      scanf("%d",&portascelta);
     }else{
-        //pthread_mutex_unlock(&mutex_choice);
-        return 0;
+      printf("Afammocc\n");
     }
+    pthread_mutex_unlock(&mutex_choice);
+    printf("UNLOCK CHANNELCONNECT\n" );
+    return 0;
 
-    //return 0;
 }
 void* menu_exec(void *arg) {
 
-  //pthread_cancel(thread_menu)
+
 
   printf("PREMI 1 PER COLLEGARTI E 2 per la lista ");
   if(indexC>0)
@@ -338,10 +331,9 @@ void* menu_exec(void *arg) {
     break;
   case 3:
     fflush(stdin);
-      //pthread_mutex_lock(&mutex_choice);
     pthread_create(&thread_channel, NULL, channelConnect, NULL);
     pthread_join(thread_channel, NULL);
-      //pthread_mutex_unlock(&mutex_channel);
+    printf("JOIN CHANNEL CONNECT\n");
     break;
   }
 
@@ -351,6 +343,7 @@ void* menu_exec(void *arg) {
 
 int main(int argc, char **argv) {
   ArrayPeers=(struct ping_protocol *)malloc(1 * sizeof(struct ping_protocol));
+  initChannel();
   char sendbuff[4096], recvbuff[4096];
 
   if (argc != 2) {
@@ -375,9 +368,7 @@ int main(int argc, char **argv) {
   scanf("%d", &Pproto.rec_port);
   Pproto.lastPing = 0;
   Pproto.flag = 0;
-  //init_array();
-  //printf("DISPLAY:\n" );
-  //display();
+
 
   pthread_create(&thread_peer, NULL, trackerConnect, NULL);
   pthread_create(&thread_receive, NULL, openPort, NULL);
@@ -385,14 +376,10 @@ int main(int argc, char **argv) {
 
   while (1) {
 
-
-    //menu_exec();
     pthread_mutex_lock(&mutex_choice);
     pthread_create(&thread_menu, NULL, menu_exec, NULL);
     pthread_join(thread_menu, NULL);
-    //pthread_mutex_lock(&mutex_channel);
-    pthread_mutex_unlock(&mutex_choice);
-  //  pthread_mutex_unlock(&mutex_channel);
+
     printf("Fottuta sleep!\n");
     sleep(2);
   }

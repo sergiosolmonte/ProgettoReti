@@ -26,13 +26,14 @@ void *insert_peers(void *);
 void *pinging(void *);
 struct ping_protocol Peer;
 struct ping_protocol *ArrayPeers;
-pthread_t thread_control, thread_ping;
+pthread_t thread_control, thread_ping,thread_array;
 
-int sock, n, control, sock;
+int sock, n, control, sock,controllore;
 int i = 0, k, j, fd = 0, peerPing;
-struct sockaddr_in addr, in, peer[10];
+struct sockaddr_in addr, in, peer[10],addMenu;
 char buff[4096];
 int len = sizeof(in);
+int len2=sizeof(addMenu);
 clock_t start;
 clock_t end_t, total_t;
 pthread_mutex_t mutex_ping = PTHREAD_MUTEX_INITIALIZER;
@@ -68,7 +69,7 @@ void *insert_peers(void *arg) {
       ArrayPeers[i] = Peer;
       */
       insert(Peer.rec_port);      //inserisce l'elemento nell'hash
-      changeValue(Peer.rec_port,start);   //Nella funzione has.h serve ad aggiornare il ping
+      changeValue(Peer.rec_port,start,Peer.name);   //Nella funzione has.h serve ad aggiornare il ping
 
       i++;
       sendto(sock, &Peer, sizeof(struct ping_protocol), 0,(struct sockaddr *)&in, len);
@@ -82,7 +83,7 @@ void *insert_peers(void *arg) {
       start = clock();
       Peer.lastPing = start;
       //indexHash=hashSearch(Peer.rec_port);
-      changeValue(Peer.rec_port,start);
+      changeValue(Peer.rec_port,start,Peer.name);
       //array[indexHash].
       //for (int j = 0; j < i;)
 
@@ -95,10 +96,8 @@ void *insert_peers(void *arg) {
     } else { // deve stampare
       pthread_mutex_lock(&mutex_ping);
       start = clock();
-      //Peer.lastPing = start;
-    //  ArrayPeers[hashSearch(Peer.rec_port)].lastPing=start;
-      //i=getCapacity();
-      changeValue(Peer.rec_port,start);
+
+      changeValue(Peer.rec_port,start,Peer.name);
       free(ArrayPeers);
       ArrayPeers=(struct ping_protocol *)malloc(1 * sizeof(struct ping_protocol));
       printf("Tempo peer richiedente: %ld\n",  array[hashSearch(Peer.rec_port)].endPing);
@@ -107,7 +106,7 @@ void *insert_peers(void *arg) {
       int k=0;
       for(n=0;n<getCapacity();n++){
           if(array[n].key>0){
-            ArrayPeers[k].rec_port=array[n].key;ArrayPeers[k].lastPing=array[n].endPing;
+            ArrayPeers[k].rec_port=array[n].key;ArrayPeers[k].lastPing=array[n].endPing;ArrayPeers[k].name=array[n].ID;
             k++;
           }
       }
@@ -140,6 +139,16 @@ void *pinging(void *arg) {
     }
   return 0;
 }
+/*
+void *send_array(void* arg){
+
+  while(1){
+  recvfrom(sock, &controllore, sizeof(int), 0,(struct sockaddr *)&addMenu, &len2);
+  sendto(sock, ArrayPeers, i*sizeof(struct ping_protocol), 0, (struct sockaddr *)&addMenu, len2);
+  }
+
+}
+*/
 
 int main(int argc, char **argv) {
 ArrayPeers=(struct ping_protocol *)malloc(1 * sizeof(struct ping_protocol));
@@ -166,6 +175,7 @@ ArrayPeers=(struct ping_protocol *)malloc(1 * sizeof(struct ping_protocol));
     perror("bind");
     exit(1);
   }
-
+  pthread_create(&thread_array,NULL,send_array,NULL);
   pthread_join(thread_control, NULL);
+  pthread_join(thread_array,NULL);
 }

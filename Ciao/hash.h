@@ -10,6 +10,7 @@
 struct data {
   int key;
   clock_t endPing;
+  char ID;
 };
 
 struct data *array;
@@ -23,7 +24,7 @@ int h2(int k) {
 }
 /* this function gives a unique hash code to the given key */
 int hashcode(int key, int i) {
-		
+
 	return ( (h1(key) + (i*h2(key)) ) % capacity);
 }
 
@@ -124,12 +125,13 @@ if(index==-1)
   }
 
 
-void changeValue(int key,clock_t ping){
+void changeValue(int key,clock_t ping,char name){
 
 			int index=hashSearch(key);
 			if (index!=-1)
 			 {
 				 array[index].endPing=ping;
+         array[index].ID=name;
 
 			 }
 

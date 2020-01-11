@@ -40,8 +40,8 @@ pthread_mutex_t mutex_ping = PTHREAD_MUTEX_INITIALIZER;
 /*
   PROTOCOLLO:
   FLAG=0 ping
-  FLAG=1
-  FLAG=2
+  FLAG=1 STAMPA PEER
+  FLAG=2 MANDA PEER PER CONTROLLO CONNESSIONE
   FLAG=4
   lastPing=0 NEWPEER
 */
@@ -90,7 +90,7 @@ void *insert_peers(void *arg) {
 
       changeValue(Peer.rec_port,start,Peer.name);
       free(ArrayPeers);
-      ArrayPeers=(struct ping_protocol *)malloc(1 * sizeof(struct ping_protocol));
+      ArrayPeers=(struct ping_protocol *)malloc(i * sizeof(struct ping_protocol));
       printf("Tempo peer richiedente: %ld\n",  array[hashSearch(Peer.rec_port)].endPing);
       sendto(sock, &i, sizeof(int), 0, (struct sockaddr *)&in, len);
       int n;

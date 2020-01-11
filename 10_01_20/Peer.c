@@ -34,7 +34,7 @@ void* menu_exec(void *);
 pthread_t thread_peer, thread_action, thread_receive, thread_menu, thread_set, thread_channel;
 
 pthread_mutex_t mutex_choice = PTHREAD_MUTEX_INITIALIZER;  //UTILIZZATO IN TUTTE LE FUNZIONI APPARTENENTI AL MENU PER SINCORNIZZARE L'ESECUZIONE DELLO STESSO
-
+pthread_mutex_t mutex_controllo= PTHREAD_MUTEX_INITIALIZER; //nel caso in cui mando flag=2 nella peer connect ho bisogno di un lock per evitare un controllo a vuoto
 int fdApp;
 int indexC = 0;
 int Saldo = 100;
@@ -51,7 +51,18 @@ struct ping_protocol *ArrayPeers;
 fd_set fset;
 
 //void sendMoney(void *);
+/*
+    BISOGNA REALIZZARE UNA FUNZIONE PER UN THREAD. QUESTA FUNZIUONE SEWRVE A GESTIRE LE CONNESSIONI IN ENTRATA
+    DA PARTE DI UN PEER PRESENTE NEL NOSTRO STATE CHANNEL, QUELLE CHE FACCIAMO NOI LE GESTIAMO TRAMITE LA channelConnect,
+    MA QUELLE IN ASCOLTO DEVONO ESSERE GESTITE DA UN THREAD PER OGNI FD APERTO, SE FATE UN CTRL+F HO INSERITO UNA F_SET DOVE
+    BISOGNEREBBE AGGIUNGERE AL DISOTTO UN pthread_create(THREAD_QUALUNQUE,NULL,FUNZIONEACCETTASTATECHANNELS,DESCRITTORE CHE METTEREMO SEMPRE APERTO)
+    ANCHE LA CHANNEL CONNECT DOVRÀ ANDARE IN QUESTO THREAD AD UN CERTO PUNTO, QUINDI LA FUNZIONE DOVRÀ ESSERE PIÙ GENERICA POSSIBILE.
+    HO PENSATO A QUESTO METODO PERCHE NON RIESCO A SINCRONIZZARE CONNESSIONI IN USCITA E IN ENTRATA.
 
+    CORDIALI SALUTI, O OH O TELETYPE
+
+
+*/
 // GESTIONE RICHIESTE DI CONNESSIONE IN ENTRATA
 void *peerAccept(void *arg) {
 
@@ -72,6 +83,7 @@ void *peerAccept(void *arg) {
   if (choice == 3) {
     printf("Quanto vuoi impegnare? (amount>=0)\n");
     scanf("%d", &amount1);
+    FD_SET(fd,&fset);//AGGIUNGE IL DESCRITTORE ALL'ARRAY fset DI TIPO fd_set
     if (amount1 <= Saldo)
       Saldo = Saldo - amount1;
 
@@ -109,7 +121,7 @@ void *peerAccept(void *arg) {
 
 void *trackerConnect(void *arg) {
 
-  while (1) {
+      /*while (1) {
 
     sendto(sockudp, &Pproto, sizeof(struct ping_protocol), 0,
            (struct sockaddr *)&servaddr, sizeof(servaddr));
@@ -120,7 +132,7 @@ void *trackerConnect(void *arg) {
       recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
       printf("RICEVUTO clock aggiornato\n");
     } else if (Pproto.flag == 1) {
-      /* Richiesta lista peer disponibili*/
+      //Richiesta lista peer disponibili
       recvfrom(sockudp, &size_peer, sizeof(int), 0, NULL, NULL); // riceve prima il size della lista
               // printf("SIZEPEER=: %d\n",size_peer);
 
@@ -147,18 +159,77 @@ void *trackerConnect(void *arg) {
       recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
     }
     sleep(2);
+  }*/
+  while (1) {
+
+    sendto(sockudp, &Pproto, sizeof(struct ping_protocol), 0,
+           (struct sockaddr *)&servaddr, sizeof(servaddr));
+
+           switch(Pproto.flag){
+
+                      case 0:
+                              if (Pproto.lastPing == 0) {
+                                  // Sono un nuovo peer
+                                  printf("MANDO SEGNALE AL TRACKER\n");
+                                  recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
+                                  printf("RICEVUTO clock aggiornato\n");
+                                }else{
+                                      //PING SEMPLICE
+                                      recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
+
+                                }
+                                break;
+
+                      case 1:
+                                /* Richiesta lista peer disponibili*/
+                                free(ArrayPeers);
+                                recvfrom(sockudp, &size_peer, sizeof(int), 0, NULL, NULL); // riceve prima il size dell'array
+                                ArrayPeers=realloc(ArrayPeers,size_peer * sizeof(struct ping_protocol));
+                                recvfrom(sockudp, ArrayPeers, size_peer*sizeof(struct ping_protocol), 0, NULL,NULL); // e poi i peer  direttamente dalla hash conenuta nel traker
+                                                                                                                    //che essendo già un puntatore ad una struct
+                                                                                                                      //non necessita di un indirizzamento
+                                printf("\tLista Peers Disponibili\n");
+
+                                for (i = 0; i < size_peer; i++) {
+
+                                    printf("ID = %c Porta= %d\n", ArrayPeers[i].name, ArrayPeers[i].rec_port);
+                                  }
+                                  printf("\n");
+                                  Pproto.flag = 0;
+                                //  printf("UNLOCK IN TRACKER CONNECT\n\n");
+                                  pthread_mutex_unlock(&mutex_choice);
+
+                                  break;
+
+                      case 2:
+                                  free(ArrayPeers);
+                                  recvfrom(sockudp, &size_peer, sizeof(int), 0, NULL, NULL);
+                                  ArrayPeers=realloc(ArrayPeers,size_peer * sizeof(struct ping_protocol));
+                                  recvfrom(sockudp, ArrayPeers, size_peer*sizeof(struct ping_protocol), 0, NULL,NULL);
+                                  Pproto.flag = 0;
+                                  pthread_mutex_unlock(&mutex_controllo);
+                                  break;
+
+           }
+
+
+
+          sleep(2);
   }
   return 0;
 }
 
 void *peerConnect(void *arg) {
 
+
   int porta;
   int amount;
+  int j;
   in_port_t porta_request;
   struct sockaddr_in toPeer;
   TRANSACTION* app4;
-  int connfd;
+  int connfd,controllore=0;
+  pthread_mutex_lock(&mutex_controllo);
 
   if ((socktcp = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
     fprintf(stderr, "socket error");
@@ -170,6 +241,18 @@ void *peerConnect(void *arg) {
 
   app4=searchChannel(porta);
 
+
+  Pproto.flag=2;
+  pthread_mutex_lock(&mutex_controllo);
+  printf("DOPO LOCK\n" );
+  for(j=0;j<size_peer;j++){
+
+      if (ArrayPeers[j].rec_port==porta){controllore=1;break;}  //NELL'ULTIMA CONNESSIONE AL TRAKER ESISTE QUELLA PORTA
+
+  }
+
+  printf("PRIMA DELL'IF\n" );
+  if(controllore==1){
   //Se sono già connesso a questa porta in uno state channel
   if(app4!=NULL){
 
@@ -210,6 +293,7 @@ void *peerConnect(void *arg) {
   } else if (verify == 3) {
     printf("\t=====CONNESSIONE ACCETTATA=====\n");
     printf("\n");
+    FD_SET(socktcp,&fset);
     if (amount <= Saldo)
       Saldo = Saldo - amount;
     snprintf(recvline, sizeof(recvline),
@@ -236,6 +320,12 @@ void *peerConnect(void *arg) {
   }
 }
 //  printf("UNLOCK IN PEER_CONNECT\n\n");
+}
+  else{
+      printf("PEER NON DISPONIBILE \n");
+}
+
+  pthread_mutex_unlock(&mutex_controllo);
   pthread_mutex_unlock(&mutex_choice);
   return 0;
 }
@@ -283,12 +373,14 @@ void *openPort(void *arg) {
 void *channelConnect(void *arg){
 
     int keyC, appFD;
+    char appID;
     int *portascelta=(int *)arg;
     TRANSACTION *app3=searchChannel(*portascelta);
 
     printf("%d\n",*portascelta );
     printf("VUOI:\n 1)INVIARE ALT \n 2)CHIUDERE IL CANALE \n" );
     fflush(stdin);
+    printf("SALDO SU CANALE = %d ALT \n",app3->stateP );
     scanf("%d",&keyC);
     switch (keyC) {
       case 1:
@@ -296,10 +388,13 @@ void *channelConnect(void *arg){
         break;
       case 2:
         appFD= app3->fd;
+        appID=app3->id;
         close(appFD);
+        FD_CLR(appFD,&fset);
         DELchannels(*portascelta);
         indexC--;
-        printf("Canale %d con %c chiuso correttamente\n",appFD,app3->id );
+        Saldo=Saldo+(app3->stateP);
+        printf("Canale %d con %c chiuso correttamente\n",appFD,appID);
         break;
     }
     pthread_mutex_unlock(&mutex_choice);
@@ -310,7 +405,7 @@ void *channelConnect(void *arg){
 
 void* menu_exec(void *arg) {
 
-  printf("CIAO PEER %c/%d, Premi: \n 1) Per collegarti ad un altro peer\n 2) Per visualizzare i peer disponibili \n ",Pproto.name,Pproto.rec_port);
+  printf("CIAO PEER %c/%d, Premi: \n 1) Per collegarti ad un Peer\n 2) Per visualizzare i peer disponibili \n ",Pproto.name,Pproto.rec_port);
   if(indexC>0)
     printf("3) Per visualizzare gli state channels\n");
 
@@ -333,6 +428,7 @@ void* menu_exec(void *arg) {
     pthread_mutex_unlock(&mutex_choice);
     printf("\n");
     break;
+  default: printf("Scelta non riconosciuta\n" );break;
   }
   return 0;
 }
@@ -341,6 +437,7 @@ int main(int argc, char **argv) {
 
   initChannel();
   char sendbuff[4096], recvbuff[4096];
+  FD_ZERO(&fset);
 
   if (argc != 2) {
     fprintf(stderr, "usage: %s <IPaddress>\n", argv[0]);

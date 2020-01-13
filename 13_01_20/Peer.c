@@ -40,7 +40,8 @@ struct floodPack {
 
 void *trackerConnect(void *);
 void *channelConnect(void *);
-void* menu_exec(void *);
+void *menu_exec(void *);
+void *Gestione(void  *) ;
 pthread_t thread_peer, thread_action, thread_receive, thread_menu, thread_set, thread_channel,thread_gestione;
 
 pthread_mutex_t mutex_choice = PTHREAD_MUTEX_INITIALIZER;  //UTILIZZATO IN TUTTE LE FUNZIONI APPARTENENTI AL MENU PER SINCORNIZZARE L'ESECUZIONE DELLO STESSO
@@ -192,7 +193,7 @@ void *trackerConnect(void *arg) {
 
           sleep(2);
   }
-  pthread_join(thread_gestione,NULL);
+   pthread_join(thread_gestione,NULL);
   return 0;
 }
 
@@ -234,7 +235,7 @@ void *peerConnect(void *arg) {
     pthread_join(thread_channel, NULL);
     //printf("JOIN CHANNEL CONNECT\n");
 
-  }else if (indexC!=0){
+  //}else if (indexC!=0){
 
     /*
 
@@ -320,22 +321,41 @@ void *peerConnect(void *arg) {
   return 0;
 }
 
+
 void *Gestione(void  *arg) {
-  int n,k=listenfd+1,j;
 
-  while (1) {/*OH oH teletype*/
+  printf("\n\nSONO IN GESTIONE\n\n" );
+  int o,k=listenfd+1,j;
+  struct floodPack Fpack;
+  while (1) {
 
-    n=select(maxfd+1,&fset,NULL,NULL,NULL);
+    pthread_mutex_lock(&mutex_fset);
+    if(indexC!=0){
 
+    o=select(maxfd+1,&fset,NULL,NULL,NULL);
+
+    printf("O_select = %d\n",o );
 
       for(j=0;j<indexC;j++){
 
-          if (FD_ISSET(k+j,&fset))
+          if (FD_ISSET(k+j,&fset)){
+                read(k+j,&Fpack,sizeof(struct floodPack));//LEGGE IL PACK DEL TIPO FLOODPACK PER CAPIRE IL DA FARSI
+                printf("DENTRO LA FD_ISSET\n" );
+                printf("REACHED = %d\n",Fpack.reached );
+              /*if (Fpack.dest_port==Pproto.rec_port){ //vuole comunicare con me
+
+
+              }*/
+
+
+          }
 
       }
-
+    }
+    pthread_mutex_unlock(&mutex_fset);
   }
 
+return 0;
 }
 
 void *openPort(void *arg) {
@@ -374,7 +394,7 @@ void *openPort(void *arg) {
 
     printf("\n\t=====TENTATIVO DI CONNESSIONE=====\n\n");
 
-    fdApp = connectfd
+    fdApp = connectfd;
 
     pthread_create(&thread_set, NULL, peerAccept, NULL);
     pthread_join(thread_set, NULL);
@@ -389,9 +409,10 @@ void *channelConnect(void *arg){
     int control;
     char appID;
 
+
     int *portascelta=(int *)arg;
     TRANSACTION *app3=searchChannel(*portascelta);
-
+    struct floodPack Fpack;
     printf("%d\n",*portascelta );
     printf("VUOI:\n 1)INVIARE ALT \n 2)CHIUDERE IL CANALE \n" );
     fflush(stdin);
@@ -400,7 +421,9 @@ void *channelConnect(void *arg){
     switch (keyC) {
       case 1:
 
+        Fpack.reached=1;
         printf("SALDO SU CANALE = %d ALT \n",app3->stateP );  //CONTROLLO != NULL VEMIVA GIA FATTO NELLA PEER CONNECT
+        write(app3->fd,&Fpack,sizeof(struct floodPack));
         break;
       case 2:
         appFD= app3->fd;

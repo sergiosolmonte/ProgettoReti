@@ -55,11 +55,13 @@ void DELchannels(int portaDEL){ //portaDEL e' la porta del channels da eliminare
       channels=ptr->pnext; //faccio scorrere la testa
       channels->pprec=NULL;
       free(ptr);
+      channelSize--;
     }
     else if(ptr->pnext==NULL){//se mi trovo in coda
       prec=ptr->pprec;
       prec->pnext=NULL; //aggiorno l'ultimo nodo
       free(ptr);
+      channelSize--;
     }
     else{ //cancellazione in mezzo
       prec=ptr->pprec;
@@ -67,6 +69,7 @@ void DELchannels(int portaDEL){ //portaDEL e' la porta del channels da eliminare
       prec->pnext=succ;//aggiorno i puntatori dei nodi adiacenti
       succ->pprec=prec;//facendo saltare quello eliminato
       free(ptr);
+      channelSize--;
     }
 
 

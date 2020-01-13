@@ -63,14 +63,17 @@ fd_set fset;
 
 //void sendMoney(void *);
 /*
-    BISOGNA REALIZZARE UNA FUNZIONE PER UN THREAD. QUESTA FUNZIUONE SEWRVE A GESTIRE LE CONNESSIONI IN ENTRATA
-    DA PARTE DI UN PEER PRESENTE NEL NOSTRO STATE CHANNEL, QUELLE CHE FACCIAMO NOI LE GESTIAMO TRAMITE LA channelConnect,
-    MA QUELLE IN ASCOLTO DEVONO ESSERE GESTITE DA UN THREAD PER OGNI FD APERTO, SE FATE UN CTRL+F HO INSERITO UNA F_SET DOVE
-    BISOGNEREBBE AGGIUNGERE AL DISOTTO UN pthread_create(THREAD_QUALUNQUE,NULL,FUNZIONEACCETTASTATECHANNELS,DESCRITTORE CHE METTEREMO SEMPRE APERTO)
-    ANCHE LA CHANNEL CONNECT DOVRÀ ANDARE IN QUESTO THREAD AD UN CERTO PUNTO, QUINDI LA FUNZIONE DOVRÀ ESSERE PIÙ GENERICA POSSIBILE.
-    HO PENSATO A QUESTO METODO PERCHE NON RIESCO A SINCRONIZZARE CONNESSIONI IN USCITA E IN ENTRATA.
 
-    CORDIALI SALUTI, O OH O TELETYPE
+
+
+
+
+    BISOGNA VEDERE CHE COSA  È LA FUNCTRION epoll()  E I SUOI RELATIVI CAZZI
+
+
+
+
+
 
 
 */
@@ -328,7 +331,7 @@ void *Gestione(void  *arg) {
   int o,k=listenfd+1,j;
   struct floodPack Fpack;
   while (1) {
-
+    FD_ZERO(&fset);
     pthread_mutex_lock(&mutex_fset);
     if(indexC!=0){
 
@@ -367,7 +370,7 @@ void *openPort(void *arg) {
     exit(1);
   }
 
-  maxfd=listenfd;
+
   struct sockaddr_in recAddr, peerAddr;
   recAddr = servaddr;
   recAddr.sin_port = htons(Pproto.rec_port);
@@ -382,6 +385,10 @@ void *openPort(void *arg) {
     exit(1);
   }
 
+maxfd=listenfd;
+pthread_mutex_lock(&mutex_fset);
+FD_SET(listenfd,&fset);
+pthread_mutex_unlock(&mutex_fset);
 
   while (1) {
 
@@ -431,7 +438,7 @@ void *channelConnect(void *arg){
         close(appFD);
         pthread_mutex_lock(&mutex_fset);
         FD_CLR(appFD,&fset);
-        maxfd--;
+
         pthread_mutex_unlock(&mutex_fset);
         DELchannels(*portascelta);
         indexC--;

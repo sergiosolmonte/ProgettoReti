@@ -49,7 +49,7 @@ pthread_mutex_t mutex_controllo= PTHREAD_MUTEX_INITIALIZER; //nel caso in cui ma
 pthread_mutex_t mutex_fset= PTHREAD_MUTEX_INITIALIZER;//mutex che ci garantisce in mutua esclusione l'inserimento e la canzellazione nell'array fset
 
 int fdApp;
-int indexC = 0;
+int indexC;
 int Saldo = 100;
 int sockudp, n, nwrite, nread, i, socktcp, size_peer, listenfd, connfd,maxfd;
 int IN_PAUSE, key;
@@ -64,17 +64,7 @@ fd_set fset;
 //void sendMoney(void *);
 /*
 
-
-
-
-
     BISOGNA VEDERE CHE COSA  È LA FUNCTRION epoll()  E I SUOI RELATIVI CAZZI
-
-
-
-
-
-
 
 */
 // GESTIONE RICHIESTE DI CONNESSIONE IN ENTRATA
@@ -97,10 +87,7 @@ void *peerAccept(void *arg) {
   if (choice == 3) {
     printf("Quanto vuoi impegnare? (amount>=0)\n");
     scanf("%d", &amount1);
-    pthread_mutex_lock(&mutex_fset);
-    FD_SET(fd,&fset);//AGGIUNGE IL DESCRITTORE ALL'ARRAY fset DI TIPO fd_set
-    maxfd++;
-    pthread_mutex_unlock(&mutex_fset);
+
     if (amount1 <= Saldo)
       Saldo = Saldo - amount1;
 
@@ -117,12 +104,13 @@ void *peerAccept(void *arg) {
     read(fd, &id, sizeof(char)); // ricevo ID interlocutore
     app2.id = id;
     int port;
-    read(fd, &port, sizeof(int)); // ricevo porta interlocutore
+    read(fd, &port, sizeof(int)); // ricevo porta interlocutoreinsertChannel
     app2.port = port;
     app2.stateP = amount1;
     insertChannel(app2); //inserisco all'interno della mia lista di state channels
     //printChannels();
     indexC++;
+
 
   } else if (choice == 4) {
     write(connfd, &choice, sizeof(int));
@@ -220,6 +208,8 @@ void *peerConnect(void *arg) {
   app4=searchChannel(porta);
 
 
+
+
   Pproto.flag=2;
   pthread_mutex_lock(&mutex_controllo);
   printf("DOPO LOCK\n" );
@@ -280,14 +270,14 @@ void *peerConnect(void *arg) {
   read(socktcp, &verify, sizeof(int));
   if (verify == 4) {
     printf("\t=====CONNESSIONE RIFIUTATA=====\n");
+    close(socktcp);
 
   } else if (verify == 3) {
     printf("\t=====CONNESSIONE ACCETTATA=====\n");
     printf("\n");
-    pthread_mutex_lock(&mutex_fset);
-    FD_SET(socktcp,&fset);
+
     maxfd++;
-    pthread_mutex_unlock(&mutex_fset);
+
     if (amount <= Saldo)
       Saldo = Saldo - amount;
     snprintf(recvline, sizeof(recvline),
@@ -310,6 +300,7 @@ void *peerConnect(void *arg) {
       insertChannel(app);
       //printChannels();
       indexC++;
+
     }
   }
 }
@@ -324,38 +315,51 @@ void *peerConnect(void *arg) {
   return 0;
 }
 
-
 void *Gestione(void  *arg) {
 
+
   printf("\n\nSONO IN GESTIONE\n\n" );
-  int o,k=listenfd+1,j;
+  pthread_mutex_lock(&mutex_fset);
+  int o,k=listenfd+1,j,l=0;
+  printf("K : %d\n", k);
   struct floodPack Fpack;
+  TRANSACTION* temp;
   while (1) {
     FD_ZERO(&fset);
-    pthread_mutex_lock(&mutex_fset);
-    if(indexC!=0){
-
-    o=select(maxfd+1,&fset,NULL,NULL,NULL);
-
-    printf("O_select = %d\n",o );
-
-      for(j=0;j<indexC;j++){
-
-          if (FD_ISSET(k+j,&fset)){
-                read(k+j,&Fpack,sizeof(struct floodPack));//LEGGE IL PACK DEL TIPO FLOODPACK PER CAPIRE IL DA FARSI
-                printf("DENTRO LA FD_ISSET\n" );
-                printf("REACHED = %d\n",Fpack.reached );
-              /*if (Fpack.dest_port==Pproto.rec_port){ //vuole comunicare con me
-
-
-              }*/
-
-
-          }
-
+    temp = channels;
+    for (i = k; i <= maxfd; i++){	//Set dei descrittori in fset
+			if ( temp->pnext != NULL){
+        printf("FD: %d\n",temp->fd);
+        FD_SET(temp->fd, &fset);
+        temp = temp->pnext;
       }
+		}
+
+    if(indexC!=0){
+      printf("Prima Select\n");
+      o=select(maxfd+1,&fset,NULL,NULL,NULL);
+      if(o==0)printf("Kitammuort\n");
+      /**/
+
+      printf("O_select = %d\n",o );
+
+        for(j=0;j<indexC;j++){
+
+            if (FD_ISSET(k+j,&fset)){
+                  read(k+j,&Fpack,sizeof(struct floodPack));//LEGGE IL PACK DEL TIPO FLOODPACK PER CAPIRE IL DA FARSI
+                  printf("DENTRO LA FD_ISSET\n" );
+                  printf("REACHED = %d\n",Fpack.reached );
+                /*if (Fpack.dest_port==Pproto.rec_port){ //vuole comunicare con me
+
+
+                }*/
+
+
+            }
+
+        }
     }
-    pthread_mutex_unlock(&mutex_fset);
+    //pthread_mutex_unlock(&mutex_fset);
   }
 
 return 0;
@@ -386,10 +390,8 @@ void *openPort(void *arg) {
   }
 
 maxfd=listenfd;
-pthread_mutex_lock(&mutex_fset);
-FD_SET(listenfd,&fset);
-pthread_mutex_unlock(&mutex_fset);
 
+pthread_mutex_unlock(&mutex_fset);
   while (1) {
 
     int connectfd;
@@ -427,7 +429,6 @@ void *channelConnect(void *arg){
     scanf("%d",&keyC);
     switch (keyC) {
       case 1:
-
         Fpack.reached=1;
         printf("SALDO SU CANALE = %d ALT \n",app3->stateP );  //CONTROLLO != NULL VEMIVA GIA FATTO NELLA PEER CONNECT
         write(app3->fd,&Fpack,sizeof(struct floodPack));
@@ -485,6 +486,7 @@ void* menu_exec(void *arg) {
 int main(int argc, char **argv) {
 
   initChannel();
+  indexC=0;
   char sendbuff[4096], recvbuff[4096];
   FD_ZERO(&fset);
 
@@ -515,7 +517,7 @@ int main(int argc, char **argv) {
   pthread_create(&thread_peer, NULL, trackerConnect, NULL);
   pthread_create(&thread_receive, NULL, openPort, NULL);
 
-  system("clear");
+//  system("clear");
   while (1) {
 
     pthread_mutex_lock(&mutex_choice);

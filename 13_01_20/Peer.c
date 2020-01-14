@@ -206,8 +206,8 @@ void *peerConnect(void *arg) {
 
 
   int porta;
-  int amount;
-  int j;
+  int amount=0;
+  int j,indice=0;
   in_port_t porta_request;
   struct sockaddr_in toPeer;
   TRANSACTION* app4;
@@ -235,21 +235,47 @@ void *peerConnect(void *arg) {
 
   printf("PRIMA DELL'IF\n" );
   if(controllore==1){
-  //Se sono già connesso a questa porta in uno state channel
+  //SE ESISTE QUESTO PEER
   if(app4!=NULL){  //2 controllo
-
+//Se sono già connesso a questa porta in uno state channel
     pthread_create(&thread_channel, NULL, channelConnect, &porta);
     pthread_join(thread_channel, NULL);
     //printf("JOIN CHANNEL CONNECT\n");
 
-  //}else if (indexC!=0){
-
     /*
+      }else if (indexC!=0){
 
-     QUI VERRA INSERITO A FUNZIONE DI FLOODING CHE CI PERMETTE DI ARRIVARE AD UN PEER ATTRAVERSO DEGLI HOP
+            TRANSACTION * appInter=channels->pnext;
+            struct floodPack Fpack;
 
-     IN CASO LA FUNZIONE CI RESTITUISCE UN VALORE false, ALLORA NESSUNO È COLLEGATO A QUEL PEER E CREO UN CANALE DIRETTO
+            printf("Quanto vuoi impegnare? (amount>0)\n");
+            scanf("%d", &amount);
 
+            Fpack.porta=porta;
+            Fpack.n_hops=0;
+            Fpack.hops[0]=Pproto.rec_port;
+            Fpack.saldoT=amount;
+            Fpack.reached=0;
+    //SE QUESTO PEER PUO ESSERE RAGGIUNTO DA UN MIO STATE CHANNEL
+
+            while(appInter!=NULL){
+
+                      write(appInter.fd,&Fpack,sizeof(struct floodPack));
+                      read(appInter.fd,&Fpack,sizeof(struct floodPack));
+                    if(Fpack.reached==1){
+
+
+
+                            break;
+
+                  }
+
+
+
+            }
+
+
+      }if(Fpack.reached==0){
   */
 }else{
 
@@ -257,8 +283,11 @@ void *peerConnect(void *arg) {
     fprintf(stderr, "socket error");
     exit(1);
   }
+
+  if(amount==0){
   printf("Quanto vuoi impegnare? (amount>0)\n");
   scanf("%d", &amount);
+  }
 
   toPeer = servaddr;
   porta_request = htons(porta);

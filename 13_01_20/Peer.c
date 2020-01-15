@@ -41,6 +41,7 @@ struct floodPack {
 
 typedef struct floodPack FLOODPACK;
 
+int searchArray(int, FLOODPACK);
 void *trackerConnect(void *);
 void *channelConnect(void *);
 void *menu_exec(void *);
@@ -262,7 +263,7 @@ void *peerConnect(void *arg) {
       printf("Quanto vuoi impegnare? (amount>0)\n");
       scanf("%d", &amount);
 
-      Fpack.porta = porta;
+      Fpack.dest_port = porta;
       Fpack.n_hops = 0;
       Fpack.hops[0] = Pproto.rec_port;
       Fpack.saldoT = amount;
@@ -271,8 +272,8 @@ void *peerConnect(void *arg) {
 
       while (appInter != NULL) {
 
-        if (appInter.stateP >= Fpack.saldoT)){
-            write(appInter.fd, &Fpack, sizeof(struct floodPack));
+        if (appInter->stateP >= Fpack.saldoT){
+            write(appInter->fd, &Fpack, sizeof(struct floodPack));
             pthread_mutex_lock(&mutex_flooding);
           }
 
@@ -405,71 +406,64 @@ void *Gestione(void *arg) {
 
         if (FD_ISSET(indice, &appFset)) {
           printf("DENTRO L'ISSET\n");
-          read(indice, &, sizeof(struct floodPack));
-          if (Fpackapp.port ==
-              Pproto.rec_port) { // se sono io il destinatario O_DESTINATARIO
+          read(indice, &Fpackapp, sizeof(struct floodPack));
+          printf("Ho letto il pacchetto, destinatario: %d\n",Fpackapp.dest_port);
+          if (Fpackapp.dest_port == Pproto.rec_port) { // se sono io (Pproto) il destinatario O_DESTINATARIO
 
-            printf("===== CONNESSIONE STATE CHANNEL =====");
+            printf("===== CONNESSIONE STATE CHANNEL =====\n");
             TRANSACTION *ptr;
 
-            ptr = searchChannel(Fpackapp.[Fpackapp.n_hops]);
+            ptr = searchChannel(Fpackapp.hops[Fpackapp.n_hops]);
             ptr->stateP = (ptr->stateP) + Fpackapp.saldoT;
 
             Fpackapp.n_hops++;
             Fpackapp.hops[Fpackapp.n_hops] = Pproto.rec_port;
             Fpackapp.reached = 1;
             write(indice, &Fpackapp, sizeof(struct floodPack));
-          } else if (Fpackapp.hops[0] == Pproto.rec_port &&
-                     Fpackapp.reached ==
-                         1) { // SE SONO IL MITTENTE E HO TROVATO IL PEER
-                              // RICHIESTO O_PEERICHIESTOMITT
+          } else if (Fpackapp.hops[0] == Pproto.rec_port && Fpackapp.reached ==1) { // SE SONO IL MITTENTE E HO TROVATO IL PEER
+                                                                                    // RICHIESTO O_PEERICHIESTOMITT
+              TRANSACTION *ptr;
+              printf("MI È ARRIVATA LA RISPOSTA DA %d, con saldoT= %d\n",Fpackapp.dest_port, Fpackapp.saldoT);
+              ptr = searchChannel(Fpackapp.hops[1]);
+              ptr->stateP = (ptr->stateP) - Fpackapp.saldoT;
+              Fpack.reached = 1;
+              pthread_mutex_unlock(&mutex_flooding);
 
-            TRANSACTION *ptr;
-            ptr = searchChannel(Fpackapp.hops[1]);
-            ptr->stateP = (ptr->stateP) - Fpackapp.saldoT;
-            Fpack.reached = 1;
-            pthread_mutex_unlock(&mutex_flooding);
-
-          } else if (Fpackapp.hops[0] == Pproto.rec_port &&
-                     Fpackapp.reached ==
-                         0) { // SE SONO IL MITTENTE E NON HO TROVATO IL PEER
-                              // O_PEERNONTROVMITT
-
-            TRANSACTION *ptr;
-            ptr = searchChannel(Fpackapp.hops[1]);
-            ptr->stateP = (ptr->stateP) + Fpackapp.saldoT;
-            Fpack.reached = 0;
-            pthread_mutex_unlock(&mutex_flooding);
+          } else if (Fpackapp.hops[0] == Pproto.rec_port && Fpackapp.reached == 0) { // SE SONO IL MITTENTE E NON HO TROVATO IL PEER
+                                                                                     // O_PEERNONTROVMITT
+              TRANSACTION *ptr;
+              ptr = searchChannel(Fpackapp.hops[1]);
+              ptr->stateP = (ptr->stateP) + Fpackapp.saldoT;
+              Fpack.reached = 0;
+              pthread_mutex_unlock(&mutex_flooding);
 
           } else { // SONO UN INTERMEDIARIO O_INTERMED
 
             printf("SONO UN INTERMEDIARIO, ciao %c \n", Pproto.name);
             TRANSACTION *ptr;
             int cisono = 0, p;
+            //Aggiungiamo il peer corrente all'array hops contenuto nel pacchetto FLOODPACK
+
             for (p = 0; p == Fpackapp.n_hops; p++) {
 
-              if (Fpackapp.hops[p] == Pproto.rec_port)
+              if (Fpackapp.hops[p] == Pproto.rec_port){
                 cisono = 1;
-              break;
-            }
-            if (cisono == 1 &&
-                Fpackapp.reached ==
-                    0) { // SE QUESTO PACK È GIA PASSATO DA ME, MA NON ABBIAMO
-                         // TROVATO IL PEER RICHIESTO
-              ptr = searchChannel(
-                  Fpackapp
-                      .hops[p - 1]); // Riaccredito il saldoT da me impegnato,
-                                     // sul canale con il mio predecessore
-              ptr->stateP = ptr->stateP + Fpackapp.saldoT;
-              ptr = searchChannel(Fpackapp.hops[p + 1]);
-              write(ptr->fd, &Fpackapp, sizeof(struct floodPack));
+                break;
+              }
 
+            }
+            if (cisono == 1 && Fpackapp.reached == 0) { // SE QUESTO PACK È GIA PASSATO DA ME, MA NON ABBIAMO
+                                                        // TROVATO IL PEER RICHIESTO
+              ptr = searchChannel(Fpackapp.hops[p - 1]); // Riaccredito il saldoT da me impegnato,
+                                                        // sul canale con il mio predecessore
+              ptr->stateP = ptr->stateP + Fpackapp.saldoT;
+
+              write(ptr->fd, &Fpackapp, sizeof(struct floodPack));
             } else {
-              if (Fpackapp.n_hops < 5) {
+              if (Fpackapp.n_hops <= 5) {
                 ptr = searchChannel(Fpackapp.dest_port);
                 if (ptr != NULL) {
-                  if (ptr->stateP >=
-                      Fpackapp.saldoT) { // Se ho saldo disponibile sul canale
+                  if (ptr->stateP >= Fpackapp.saldoT) { // Se ho saldo disponibile sul canale
                                          // con il destinatario
 
                     ptr->stateP = ptr->stateP - Fpackapp.saldoT;
@@ -477,6 +471,7 @@ void *Gestione(void *arg) {
                     Fpackapp.hops[Fpackapp.n_hops] = Pproto.rec_port;
                     write(ptr->fd, &Fpackapp, sizeof(struct floodPack));
 
+                    }
                     else { // SE NON HO SALDO SUFFICIENTE
                       ptr = searchChannel(
                           Fpackapp.hops[Fpackapp.n_hops]); // Ricerco il mio
@@ -493,11 +488,9 @@ void *Gestione(void *arg) {
                     ptr = channels->pnext;
                     TRANSACTION *pointer;
                     while (ptr != NULL) {
-                      if (!ricercaArray(
-                              ptr->port,
-                              Fpackapp)) { // se la porta non e' già presente
-                                           // negli hop precedenti vado a
-                                           // scrivere
+                      if (!searchArray(ptr->port,Fpackapp)) { // se la porta non e' già presente
+                                                              // negli hop precedenti vado a
+                                                              // scrivere
 
                         ptr->stateP = ptr->stateP - Fpackapp.saldoT;
                         write(ptr->fd, &Fpackapp, sizeof(struct floodPack));
@@ -591,10 +584,14 @@ void *Gestione(void *arg) {
       fflush(stdin);
       scanf("%d", &appAmount);
       if (appAmount <= app3->stateP) {
+        Fpack.dest_port=*portascelta;
+        Fpack.n_hops=0;
+        Fpack.reached=0;
+        Fpack.saldoT=appAmount;
+        Fpack.hops[0]=Pproto.rec_port;
         write(app3->fd, &Fpack, sizeof(struct floodPack));
       } else {
-        printf("NON PUOI EFFETTUARE QUESTO MOVIMENTO, FONDI SUL CANALE "
-               "INSUFFICIENTI\n");
+        printf("NON PUOI EFFETTUARE QUESTO MOVIMENTO, FONDI SUL CANALE INSUFFICIENTI\n");
       }
       break;
     case 2:
@@ -697,8 +694,8 @@ void *Gestione(void *arg) {
 
   int searchArray(int port, struct floodPack a) {
     int j;
-    for (j = 0; j < nHops; j++) {
-      if (port == a[j])
+    for (j = 0; j < a.n_hops; j++) {
+      if (port == a.hops[j])
         return 1;
     }
     return 0;

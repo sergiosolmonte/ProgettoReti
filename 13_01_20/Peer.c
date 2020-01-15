@@ -215,14 +215,10 @@ void *peerConnect(void *arg) {
   pthread_mutex_lock(&mutex_controllo);
 
 
-
   printf("Inserisci la porta del peer al quale vuoi connetterti\n");
   scanf("%d", &porta);
 
   app4=searchChannel(porta);
-
-
-
 
   Pproto.flag=2;
   pthread_mutex_lock(&mutex_controllo);
@@ -390,15 +386,33 @@ void *Gestione(void  *arg) {
         o_select=select(maxfd+1,&appFset,NULL,NULL,&timer);
 
       //  printf("MAXFD %d\n",maxfd);
-
         if(o_select!=0)  {
           for(indice=listenfd+1;indice<=maxfd;indice++){
 
-                if(FD_ISSET(indice,&appFset)){
-                      printf("DENTRO L'ISSET\n");
-                      read(indice,&Fpack,sizeof(struct floodPack));
-                      printf("REACHED = %d\n",Fpack.reached );
-                }
+                    if(FD_ISSET(indice,&appFset)){
+                          printf("DENTRO L'ISSET\n");
+                          read(indice,&Fpack,sizeof(struct floodPack));
+                        if(Fpack.port==Pproto.rec_port){ //se sono io il destinatario
+                            printf("REACHED = %d\n",Fpack.reached );
+                            TRANSACTION * ptr;
+                            Fpack.reached=1;
+                            ptr=searchChannel(Fpack.[Fpack.n_hops]);
+                            ptr->stateP=(ptr->stateP)+Fpack.saldoT;
+
+                            Fpack.n_hops++;
+                            Fpack.hops[Fpack.n_hops]=Pproto.rec_port;
+                            write(indice,&Fpack,sizeof(struct floodPack));
+                            /* code */
+
+                        }else if (Fpack.n_hops==1 && Fpack.reached==1){
+
+                            TRANSACTION * ptr;
+                            ptr=searchChannel(Fpack.[Fpack.n_hops]);
+                            ptr->stateP=(ptr->stateP)-Fpack.saldoT;
+
+
+                        }
+                  }
           }
 
 
@@ -459,7 +473,6 @@ void *channelConnect(void *arg){
     int control;
     char appID;
 
-
     int *portascelta=(int *)arg;
     TRANSACTION *app3=searchChannel(*portascelta);
     struct floodPack Fpack;
@@ -478,7 +491,6 @@ void *channelConnect(void *arg){
         appFD= app3->fd;
         appID=app3->id;
         close(appFD);
-
         DELchannels(*portascelta);
         indexC--;
         Saldo=Saldo+(app3->stateP);
@@ -488,7 +500,6 @@ void *channelConnect(void *arg){
     pthread_mutex_unlock(&mutex_choice);
     //printf("UNLOCK CHANNELCONNECT\n\n" );
     return 0;
-
 }
 
 void* menu_exec(void *arg) {

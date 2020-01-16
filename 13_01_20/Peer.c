@@ -260,7 +260,7 @@ void *peerConnect(void *arg) {
       TRANSACTION *appInter = channels->pnext;
 
       pthread_mutex_lock(&mutex_flooding);
-      printf("Quanto vuoi impegnare? (amount>0)\n");
+      printf("Quanto vuoi scambiare? (amount>0)\n");
       scanf("%d", &amount);
 
       Fpack.dest_port = porta;
@@ -270,12 +270,15 @@ void *peerConnect(void *arg) {
       Fpack.reached = 0;
       // SE QUESTO PEER PUO ESSERE RAGGIUNTO DA UN MIO STATE CHANNEL
 
+      //Controllo i miei state channels
       while (appInter != NULL) {
 
         if (appInter->stateP >= Fpack.saldoT){
             write(appInter->fd, &Fpack, sizeof(struct floodPack));
             pthread_mutex_lock(&mutex_flooding);
+
           }
+
 
         if (Fpack.reached == 1) {
 
@@ -350,14 +353,15 @@ void *peerConnect(void *arg) {
 
         if (amount <= Saldo)
           Saldo = Saldo - amount;
-        snprintf(recvline, sizeof(recvline),
-                 "Ci siamo collegati sulla mia porta %d \n", Pproto.rec_port);
+
+        snprintf(recvline, sizeof(recvline),"Ci siamo collegati sulla mia porta %d \n", Pproto.rec_port);
         lung = strlen(recvline);
         write(socktcp, &lung, sizeof(int));
         write(socktcp, recvline, strlen(recvline));
         read(socktcp, &idPeerConn, sizeof(char));
         write(socktcp, &Pproto.name, sizeof(char));
         write(socktcp, &Pproto.rec_port, sizeof(int));
+
         // Inserire il peer nella propria lista dei peer
         if (indexC < 5) {
 
@@ -388,10 +392,9 @@ void *peerConnect(void *arg) {
 void *Gestione(void *arg) {
 
   printf("\n\nSONO IN GESTIONE\n\n");
-
+  struct floodPack Fpackapp;
   struct timeval timer;
   int o_select, indice;
-  struct floodPack Fpackapp;
 
   while (1) {
 
@@ -405,9 +408,12 @@ void *Gestione(void *arg) {
       for (indice = listenfd + 1; indice <= maxfd; indice++) {
 
         if (FD_ISSET(indice, &appFset)) {
+          pthread_cancel(thread_menu);
           printf("DENTRO L'ISSET\n");
+          memset(&Fpackapp,0,sizeof(struct floodPack));
           read(indice, &Fpackapp, sizeof(struct floodPack));
           printf("Ho letto il pacchetto, destinatario: %d\n",Fpackapp.dest_port);
+
           if (Fpackapp.dest_port == Pproto.rec_port) { // se sono io (Pproto) il destinatario O_DESTINATARIO
 
             printf("===== CONNESSIONE STATE CHANNEL =====\n");
@@ -420,8 +426,8 @@ void *Gestione(void *arg) {
             Fpackapp.hops[Fpackapp.n_hops] = Pproto.rec_port;
             Fpackapp.reached = 1;
             write(indice, &Fpackapp, sizeof(struct floodPack));
-          } else if (Fpackapp.hops[0] == Pproto.rec_port && Fpackapp.reached ==1) { // SE SONO IL MITTENTE E HO TROVATO IL PEER
-                                                                                    // RICHIESTO O_PEERICHIESTOMITT
+          } else if (Fpackapp.hops[0] == Pproto.rec_port && Fpackapp.reached == 1) { // SE SONO IL MITTENTE E HO TROVATO IL PEER
+                printf("HO TROVATO IL PEER\n" );                                                                    // RICHIESTO O_PEERICHIESTOMITT
               TRANSACTION *ptr;
               printf("MI È ARRIVATA LA RISPOSTA DA %d, con saldoT= %d\n",Fpackapp.dest_port, Fpackapp.saldoT);
               ptr = searchChannel(Fpackapp.hops[1]);
@@ -430,7 +436,7 @@ void *Gestione(void *arg) {
               pthread_mutex_unlock(&mutex_flooding);
 
           } else if (Fpackapp.hops[0] == Pproto.rec_port && Fpackapp.reached == 0) { // SE SONO IL MITTENTE E NON HO TROVATO IL PEER
-                                                                                     // O_PEERNONTROVMITT
+              printf("SONO IL MITTENTE E NON HO TROVATO\n" );                           // O_PEERNONTROVMITT
               TRANSACTION *ptr;
               ptr = searchChannel(Fpackapp.hops[1]);
               ptr->stateP = (ptr->stateP) + Fpackapp.saldoT;
@@ -439,7 +445,8 @@ void *Gestione(void *arg) {
 
           } else { // SONO UN INTERMEDIARIO O_INTERMED
 
-            printf("SONO UN INTERMEDIARIO, ciao %c \n", Pproto.name);
+            printf("SONO UN INTERMEDIARIO, ciao %c porta richiesta: %d \n", Pproto.name,Fpackapp.dest_port);
+
             TRANSACTION *ptr;
             int cisono = 0, p;
             //Aggiungiamo il peer corrente all'array hops contenuto nel pacchetto FLOODPACK
@@ -452,20 +459,21 @@ void *Gestione(void *arg) {
               }
 
             }
+
             if (cisono == 1 && Fpackapp.reached == 0) { // SE QUESTO PACK È GIA PASSATO DA ME, MA NON ABBIAMO
                                                         // TROVATO IL PEER RICHIESTO
               ptr = searchChannel(Fpackapp.hops[p - 1]); // Riaccredito il saldoT da me impegnato,
                                                         // sul canale con il mio predecessore
               ptr->stateP = ptr->stateP + Fpackapp.saldoT;
-
+              printf("CI SONO\n");
               write(ptr->fd, &Fpackapp, sizeof(struct floodPack));
-            } else {
+            } else if(cisono=0 && Fpackapp.reached==0) {
               if (Fpackapp.n_hops <= 5) {
                 ptr = searchChannel(Fpackapp.dest_port);
                 if (ptr != NULL) {
                   if (ptr->stateP >= Fpackapp.saldoT) { // Se ho saldo disponibile sul canale
                                          // con il destinatario
-
+                    printf("HO SALDO E COMUNCIO CON %c \n",ptr->id);
                     ptr->stateP = ptr->stateP - Fpackapp.saldoT;
                     Fpackapp.n_hops++;
                     Fpackapp.hops[Fpackapp.n_hops] = Pproto.rec_port;
@@ -506,8 +514,16 @@ void *Gestione(void *arg) {
                   ptr = searchChannel(Fpack.hops[4]);
                   write(ptr->fd, &Fpackapp, sizeof(FLOODPACK));
                 }
+              }else if(cisono==1 && Fpackapp.reached==1){
+                  TRANSACTION *ptr;
+                  ptr = searchChannel(Fpackapp.hops[p-1]);
+                  write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
+
+
+
               }
             }
+            pthread_mutex_unlock(&mutex_choice);
           }
         }
       }

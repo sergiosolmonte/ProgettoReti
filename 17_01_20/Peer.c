@@ -101,9 +101,9 @@ void *peerAccept(void *arg) {
   scanf("%d", &choice);
 
   if (choice == 3) {
-    printf("Quanto vuoi impegnare? (amount>=0)\n");
+    printf("Quanto vuoi impegnare?\n AMOUNT = ");
     scanf("%d", &amount1);
-
+    printf("\n" );
     pthread_mutex_lock(&mutex_fset);
     FD_SET(fd, &fsetmaster);
 
@@ -116,10 +116,9 @@ void *peerAccept(void *arg) {
       Saldo = Saldo - amount1;
 
     write(fd, &choice, sizeof(int));
-    read(fd, &lungh, sizeof(int));
-    read(fd, recvline2, lungh * sizeof(char));
     write(fd, &Pproto.name, sizeof(char));
-    printf("%s \n", recvline2);
+    system("clear");
+
 
     TRANSACTION app2;
     app2.fd = fd;
@@ -132,10 +131,12 @@ void *peerAccept(void *arg) {
     app2.stateP = amount1;
     insertChannel(app2); // inserisco all'interno della mia lista di state channels
     indexC++;
+    printf("\nMI SONO COLLEGATO CON %c ALLA SUA PORTA %d\n",app2.id, app2.port);
 
   } else if (choice == 4) {
     write(connfd, &choice, sizeof(int));
     close(connfd);
+    system("clear");
     printf("Canale Chiuso\n");
   }
   sleep(2);
@@ -159,9 +160,9 @@ void *trackerConnect(void *arg) {
     case 0:
       if (Pproto.lastPing == 0) {
         // Sono un nuovo peer
-        printf("MANDO SEGNALE AL TRACKER\n");
+
         recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
-        printf("RICEVUTO clock aggiornato\n");
+
       } else {
         // PING SEMPLICE
         recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
@@ -197,10 +198,8 @@ void *trackerConnect(void *arg) {
     case 2:
       free(ArrayPeers);
       recvfrom(sockudp, &size_peer, sizeof(int), 0, NULL, NULL);
-      ArrayPeers =
-          realloc(ArrayPeers, size_peer * sizeof(struct ping_protocol));
-      recvfrom(sockudp, ArrayPeers, size_peer * sizeof(struct ping_protocol), 0,
-               NULL, NULL);
+      ArrayPeers =  realloc(ArrayPeers, size_peer * sizeof(struct ping_protocol));
+      recvfrom(sockudp, ArrayPeers, size_peer * sizeof(struct ping_protocol), 0, NULL, NULL);
       Pproto.flag = 0;
       pthread_mutex_unlock(&mutex_controllo);
       break;
@@ -219,10 +218,12 @@ void *peerConnect(void *arg) {
   in_port_t porta_request;
   struct sockaddr_in toPeer;
   TRANSACTION *app4;
-  int connfd, controllore = 0;
+  int connfd, control = 0;
   pthread_mutex_lock(&mutex_controllo);
 
-  printf("Inserisci la porta del peer al quale vuoi connetterti\n");
+  fflush(stdin);
+  printf("\nInserisci la porta del peer al quale vuoi connetterti\n");
+  printf("PORTA = ");
   scanf("%d", &porta);
 
   app4 = searchChannel(porta);
@@ -231,32 +232,30 @@ void *peerConnect(void *arg) {
   pthread_mutex_lock(&mutex_controllo);
 
   if(porta==Pproto.rec_port){
-    controllore=0;
+    control=0;
   }else{
 
     for (j = 0; j < size_peer; j++) {
-
       if (ArrayPeers[j].rec_port == porta) {
-        controllore = 1;
+        control = 1;
         break;
       } // NELL'ULTIMA CONNESSIONE AL TRAKER ESISTE QUELLA PORTA 1 controllo
     }
   }
 
-  if (controllore == 1) {
+  if (control == 1) {
     // SE ESISTE QUESTO PEER
     if (app4 != NULL) { // 2 controllo
       // Se sono già connesso a questa porta in uno state channel
       pthread_create(&thread_channel, NULL, channelConnect, &porta);
       pthread_join(thread_channel, NULL);
 
-    } else if (indexC != 0) { // HO DEGLI STATE CHANNEL APERTI E PROVERO A
-                              // VEDERE SE LI POSSO USARE
+    } else if (indexC != 0) { // HO DEGLI STATE CHANNEL APERTI E PROVERO A VEDERE SE LI POSSO USARE
 
       TRANSACTION *appInter = channels->pnext;
 
       pthread_mutex_lock(&mutex_flooding);
-      printf("Quanto vuoi scambiare? (amount>0)\n");
+      printf("Quanto vuoi scambiare? (ALT>0)\n");
       scanf("%d", &amount);
 
       Fpack.dest_port = porta;
@@ -305,11 +304,11 @@ void *peerConnect(void *arg) {
       }
 
       if(Fpack.reached==0){
-        printf("IMPOSSIBILE SCAMBIARE, VERRÀ impegnato UN CANALE\n" );
+        printf("\nIMPOSSIBILE SCAMBIARE, VERRÀ CREATO UNO STATE CHANNEL \n");
 
       }
       if (amount == 0) {
-        printf("Quanto vuoi impegnare? (amount>0)\n");
+        printf("\nQUANTI ALT VUOI IMPEGNARE? \n(amount>0)\n AMOUNT = ");
         scanf("%d", &amount);
       }
 
@@ -322,9 +321,7 @@ void *peerConnect(void *arg) {
       }
 
       // HO USATO ALT COME MONETA IN ONORE DEL MAGICO
-      snprintf(recvline, sizeof(recvline),
-               "Ciao sono il peer %c e vorrei connettermi con %d ALT\n",
-               Pproto.name, amount);
+      snprintf(recvline, sizeof(recvline),"\nCiao sono il peer %c e vorrei connettermi con %d ALT\n", Pproto.name, amount);
       int lung;
       lung = strlen(recvline);
 
@@ -336,11 +333,13 @@ void *peerConnect(void *arg) {
       char idPeerConn;
       read(socktcp, &verify, sizeof(int));
       if (verify == 4) {
-        printf("\t=====CONNESSIONE RIFIUTATA=====\n");
+        system("clear");
+        printf("\n=====CONNESSIONE RIFIUTATA=====\n");
         close(socktcp);
 
       } else if (verify == 3) {
-        printf("\t=====CONNESSIONE ACCETTATA=====\n");
+        system("clear");
+        printf("\n=====CONNESSIONE ACCETTATA=====\n");
         printf("\n");
 
         pthread_mutex_lock(&mutex_fset);
@@ -354,10 +353,6 @@ void *peerConnect(void *arg) {
         if (amount <= Saldo)
           Saldo = Saldo - amount;
 
-        snprintf(recvline, sizeof(recvline),"Ci siamo collegati sulla mia porta %d \n", Pproto.rec_port);
-        lung = strlen(recvline);
-        write(socktcp, &lung, sizeof(int));
-        write(socktcp, recvline, strlen(recvline));
         read(socktcp, &idPeerConn, sizeof(char));
         write(socktcp, &Pproto.name, sizeof(char));
         write(socktcp, &Pproto.rec_port, sizeof(int));
@@ -377,7 +372,7 @@ void *peerConnect(void *arg) {
       }
     }
   } else {
-    printf("PEER NON DISPONIBILE \n");
+    printf("\nPEER NON DISPONIBILE \n");
   }
 
   pthread_mutex_unlock(&mutex_controllo);
@@ -404,19 +399,9 @@ void *Gestione(void *arg) {
     //Controlliamo tutti i descrittori nell'fset
       for (indice = listenfd + 1; indice <= maxfd; indice++) {
 
-       /*
-        if(FD_ISSET(indice,&exceptfds)){
-            FD_CLR(indice,&fsetmaster);
-            indexC--;
-            int portApp=getPort(indice);  //CERCO LA PORTA DA ELIMINARE NELLA LISTA ASSOCIATA A INDICE
-            DELchannels(portApp);   //LA ELIMINO DALLA LISTA
-
-        }
-        */
-
         if (FD_ISSET(indice, &appFset)) {
           pthread_cancel(thread_menu);
-          printf("DENTRO L'ISSET\n");
+          //printf("DENTRO L'ISSET\n");
           memset(&Fpackapp,0,sizeof(struct floodPack));
           read(indice, &Fpackapp, sizeof(struct floodPack));
 
@@ -426,17 +411,15 @@ void *Gestione(void *arg) {
             FD_CLR(indice,&fsetmaster);   //  INIZIALIZZATO A 0;
             indexC--;
             int portApp=getPort(indice);  //CERCO LA PORTA DA ELIMINARE NELLA LISTA ASSOCIATA A INDICE
+            TRANSACTION *ptr= searchChannel(portApp);
+            Saldo=Saldo+ptr->stateP;
             DELchannels(portApp);
-
           }
           else{
 
-
-          printf("Ho letto il pacchetto, destinatario: %d\n",Fpackapp.dest_port);
-
           // se sono io (Pproto) il destinatario
           if (Fpackapp.dest_port == Pproto.rec_port) {
-
+            system("clear");
             printf("===== CONNESSIONE STATE CHANNEL =====\n");
             TRANSACTION *ptr;
 
@@ -454,9 +437,8 @@ void *Gestione(void *arg) {
           else if(Fpackapp.reached==1){
 
               if (Fpackapp.hops[0] == Pproto.rec_port){   //SE SONO IO QUELLO CHE HA RICHIESTO LA CONNESSIONE, DEVO SBLOCCARE IL MUTEX BLOCCATO NELLA PEER CONNECT
-                  printf("HO TROVATO IL PEER\n" );
                   TRANSACTION *ptr;
-                  printf("MI È ARRIVATA LA RISPOSTA DA %d, con saldoT= %d\n",Fpackapp.dest_port, Fpackapp.saldoT);
+                  printf("MI È ARRIVATA LA RISPOSTA DA %d, HA RICEVUTO %d ALT\n",Fpackapp.dest_port, Fpackapp.saldoT);
                   ptr = searchChannel(Fpackapp.hops[1]);
                   ptr->stateP = (ptr->stateP) - Fpackapp.saldoT;
                   Fpack=Fpackapp;
@@ -619,7 +601,7 @@ void *openPort(void *arg) {
         exit(1);
       }
 
-      printf("\n\t=====TENTATIVO DI CONNESSIONE=====\n\n");
+      printf("\n=====TENTATIVO DI CONNESSIONE=====\n\n");
 
       fdApp = connectfd;
 
@@ -627,6 +609,7 @@ void *openPort(void *arg) {
       pthread_join(thread_set, NULL);
     }
     sleep(2);
+    system("clear");
     exit(0);
   }
 
@@ -649,6 +632,7 @@ void *channelConnect(void *arg) {
       printf("SALDO SU CANALE = %d ALT \n Quanto vuoi inviare? \n",
              app3->stateP); // CONTROLLO != NULL VEMIVA GIA FATTO NELLA PEER
                             // CONNECT
+
       fflush(stdin);
       scanf("%d", &appAmount);
       if (appAmount <= app3->stateP) {
@@ -658,7 +642,9 @@ void *channelConnect(void *arg) {
         Fpack.saldoT=appAmount;
         Fpack.hops[0]=Pproto.rec_port;
         write(app3->fd, &Fpack, sizeof(struct floodPack));
+        system("clear");
       } else {
+        system("clear");
         printf("NON PUOI EFFETTUARE QUESTO MOVIMENTO, FONDI SUL CANALE INSUFFICIENTI\n");
       }
       break;
@@ -666,13 +652,15 @@ void *channelConnect(void *arg) {
       appFD = app3->fd;
       appID = app3->id;
       close(appFD);
+      Saldo = Saldo + (app3->stateP);
+      printf("Il tuo saldo totale: %d\n", Saldo);
       DELchannels(*portascelta);
       FD_CLR(appFD,&fsetmaster);
       indexC--;
-      Saldo = Saldo + (app3->stateP);
+
       system("clear");
       printf("Canale %d con %c chiuso correttamente\n", appFD, appID);
-      printf("SALDO TOTALE = %d\n", Saldo );
+      //printf("SALDO TOTALE = %d\n", Saldo );
       break;
     }
     pthread_mutex_unlock(&mutex_choice);
@@ -721,6 +709,8 @@ int main(int argc, char **argv) {
     char sendbuff[4096], recvbuff[4096];
     FD_ZERO(&fsetmaster);
     Saldo=100;
+    int hashRes=0;
+    int schifometro=0;
 
     if (argc != 2) {
       fprintf(stderr, "usage: %s <IPaddress>\n", argv[0]);
@@ -740,12 +730,16 @@ int main(int argc, char **argv) {
 
     printf("INSERIRE NOME PEER\n");
     scanf("%c", &Pproto.name);
+  while(hashRes==0){
     printf("QUALE PORTA USI PER RICEVERE?\n");
     scanf("%d", &Pproto.rec_port);
     Pproto.lastPing = 0;
     Pproto.flag = 0;
 
     pthread_create(&thread_peer, NULL, trackerConnect, NULL);
+    recvfrom(sockudp,&hashRes,sizeof(int),0,NULL,NULL);
+
+    if(hashRes==1){
     pthread_create(&thread_receive, NULL, openPort, NULL);
     pthread_create(&thread_gestione, NULL, Gestione, NULL);
 
@@ -761,7 +755,20 @@ int main(int argc, char **argv) {
     pthread_join(thread_receive, NULL);
     pthread_join(thread_peer, NULL);
     pthread_join(thread_gestione, NULL);
+
+    }
+    else{
+        if(schifometro>1)
+        {printf("\n\tCHE PROBLEMI HAI?\n");}
+
+        printf("\nPORTA GIÀ UTILIZZATA\n");
+        pthread_cancel(thread_peer);
+        pthread_join(thread_peer,NULL);
+        schifometro++;
+    }
+}
     exit(0);
+
   }
 
 int searchArray(int port, struct floodPack a) {

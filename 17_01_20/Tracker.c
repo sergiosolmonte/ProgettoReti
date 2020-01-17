@@ -46,6 +46,7 @@ pthread_mutex_t mutex_ping = PTHREAD_MUTEX_INITIALIZER;
   lastPing=0 NEWPEER
 */
 void *insert_peers(void *arg) {
+  int hashRes;
   while (1) {
 
     recvfrom(sock, &Peer, sizeof(struct ping_protocol), 0,
@@ -61,13 +62,21 @@ void *insert_peers(void *arg) {
       start = clock();
       Peer.lastPing = start;
       pthread_mutex_lock(&mutex_ping);
+      if(hashSearch(Peer.rec_port)==-1){ //se la porta richiesta non è già presente allora la posso inserire
+        insert(Peer.rec_port);                        //inserisce l'elemento nell'hash
+        changeValue(Peer.rec_port,start,Peer.name);   //Nella funzione has.h serve ad aggiornare il ping
+        i++;
+        hashRes=1;
+        sendto(sock, &hashRes, sizeof(struct ping_protocol), 0,(struct sockaddr *)&in, len);
+        sendto(sock, &Peer, sizeof(struct ping_protocol), 0,(struct sockaddr *)&in, len);
+        pthread_mutex_unlock(&mutex_ping);
+      }
+      else{ //altrimenti no
+          hashRes=0;
+          sendto(sock, &hashRes, sizeof(struct ping_protocol), 0,(struct sockaddr *)&in, len);
+          pthread_mutex_unlock(&mutex_ping);
+      }
 
-      insert(Peer.rec_port);                        //inserisce l'elemento nell'hash
-      changeValue(Peer.rec_port,start,Peer.name);   //Nella funzione has.h serve ad aggiornare il ping
-
-      i++;
-      sendto(sock, &Peer, sizeof(struct ping_protocol), 0,(struct sockaddr *)&in, len);
-      pthread_mutex_unlock(&mutex_ping);
 
       }
       else if (Peer.flag == 0)
@@ -133,6 +142,7 @@ int main(int argc, char **argv) {
 ArrayPeers=(struct ping_protocol *)malloc(1 * sizeof(struct ping_protocol));
   init_array();
   start = clock();
+  printf("\n\t=====TRACKER IS ON=====\n");
   if ((sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
     perror("socket");
     exit(1);

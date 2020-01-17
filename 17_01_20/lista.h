@@ -91,7 +91,7 @@ TRANSACTION* searchChannel(int portaKEY){
 }
 
 void  printNode(TRANSACTION **el) {
-  printf("FD=%d\nID=%c\nPORTA=%d\nSTATO=%d\n",(*el)->fd,(*el)->id,(*el)->port,(*el)->stateP );
+  printf("ID=%c\tPORTA=%d\tSTATO=%d\t\n",(*el)->id,(*el)->port,(*el)->stateP );
 }
 
 void printChannels(){

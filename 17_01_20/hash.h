@@ -55,7 +55,6 @@ int get_prime(int n) {
 void init_array() {
   int i;
   capacity = get_prime(capacity);
-	printf("capacity: %d\n",capacity );
   array = (struct data *)malloc(capacity * sizeof(struct data));
   for (i = 0; i < capacity; i++) {
     array[i].key = 0;

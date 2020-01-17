@@ -9,7 +9,7 @@
 #include <sys/socket.h> /* socket library */
 #include <sys/time.h>
 #include <sys/types.h> /* predefined types */
-#include <time.h>
+#include <time.h> /*select quando crolla una connessione in c*/
 #include <unistd.h> /* include unix standard library */
 
 #include "lista.h"
@@ -67,7 +67,7 @@ pthread_mutex_t mutex_flooding =
                                // PACCHETTI floodPack
 int fdApp;
 int indexC;
-int Saldo = 100;
+int Saldo ;
 int sockudp, n, nwrite, nread, i, socktcp, size_peer, listenfd, connfd, maxfd;
 int IN_PAUSE, key;
 char recvline[1025];
@@ -138,6 +138,7 @@ void *peerAccept(void *arg) {
     close(connfd);
     printf("Canale Chiuso\n");
   }
+  sleep(2);
   pthread_mutex_unlock(&mutex_choice);
   IN_PAUSE = 0;
 
@@ -229,14 +230,18 @@ void *peerConnect(void *arg) {
   Pproto.flag = 2;
   pthread_mutex_lock(&mutex_controllo);
 
-  for (j = 0; j < size_peer; j++) {
+  if(porta==Pproto.rec_port){
+    controllore=0;
+  }else{
 
-    if (ArrayPeers[j].rec_port == porta) {
-      controllore = 1;
-      break;
-    } // NELL'ULTIMA CONNESSIONE AL TRAKER ESISTE QUELLA PORTA 1 controllo
+    for (j = 0; j < size_peer; j++) {
+
+      if (ArrayPeers[j].rec_port == porta) {
+        controllore = 1;
+        break;
+      } // NELL'ULTIMA CONNESSIONE AL TRAKER ESISTE QUELLA PORTA 1 controllo
+    }
   }
-
 
   if (controllore == 1) {
     // SE ESISTE QUESTO PEER
@@ -290,8 +295,7 @@ void *peerConnect(void *arg) {
       }
 
     }
-
-    if (indexC == 0 || Fpack.reached == 0) { // CASO IN CUI NON HO ANCORA EFFETTUATO NESSUNA
+    else if (indexC == 0 || Fpack.reached == 0) { // CASO IN CUI NON HO ANCORA EFFETTUATO NESSUNA
                         // CONNESSIONE INDEXC=0 OPPURE SE LA RICERCA NON HA
                         // TROVATO UN CAMMINO REACHED=0
 
@@ -395,23 +399,39 @@ void *Gestione(void *arg) {
     timer.tv_usec = 0;
     o_select = select(maxfd + 1, &appFset, NULL, &exceptfds, &timer);
 
-    if (o_select != 0) {
 
-      //Controlliamo tutti i descrittori nell'fset
+    if (o_select >= 0) {
+    //Controlliamo tutti i descrittori nell'fset
       for (indice = listenfd + 1; indice <= maxfd; indice++) {
 
+       /*
         if(FD_ISSET(indice,&exceptfds)){
             FD_CLR(indice,&fsetmaster);
             indexC--;
             int portApp=getPort(indice);  //CERCO LA PORTA DA ELIMINARE NELLA LISTA ASSOCIATA A INDICE
             DELchannels(portApp);   //LA ELIMINO DALLA LISTA
+
         }
+        */
 
         if (FD_ISSET(indice, &appFset)) {
           pthread_cancel(thread_menu);
           printf("DENTRO L'ISSET\n");
           memset(&Fpackapp,0,sizeof(struct floodPack));
           read(indice, &Fpackapp, sizeof(struct floodPack));
+
+
+          if(Fpackapp.dest_port==0){
+            printf("IL PEER NON COMUNICA PIÙ SULLA PORTA %d\n",getPort(indice) );                            // QUESTO CONTROLLO CI SERVE A CAPIRE SE UN PEER È MORTO E QUINDI SUL SUO DESCRITTORE RESTA BLOCCATO UN pacchetto
+            FD_CLR(indice,&fsetmaster);   //  INIZIALIZZATO A 0;
+            indexC--;
+            int portApp=getPort(indice);  //CERCO LA PORTA DA ELIMINARE NELLA LISTA ASSOCIATA A INDICE
+            DELchannels(portApp);
+
+          }
+          else{
+
+
           printf("Ho letto il pacchetto, destinatario: %d\n",Fpackapp.dest_port);
 
           // se sono io (Pproto) il destinatario
@@ -550,14 +570,18 @@ void *Gestione(void *arg) {
                      }
                }
         }
-
+        }
 
           pthread_mutex_unlock(&mutex_choice);
           }
 
         }
+
       }
+
     }
+
+
     return 0;
   }
 
@@ -615,7 +639,7 @@ void *channelConnect(void *arg) {
 
     int *portascelta = (int *)arg;
     TRANSACTION *app3 = searchChannel(*portascelta);
-    
+
     printf("VUOI:\n 1)INVIARE ALT \n 2)CHIUDERE IL CANALE \n");
     fflush(stdin);
     scanf("%d", &keyC);
@@ -646,8 +670,9 @@ void *channelConnect(void *arg) {
       FD_CLR(appFD,&fsetmaster);
       indexC--;
       Saldo = Saldo + (app3->stateP);
+      system("clear");
       printf("Canale %d con %c chiuso correttamente\n", appFD, appID);
-
+      printf("SALDO TOTALE = %d\n", Saldo );
       break;
     }
     pthread_mutex_unlock(&mutex_choice);
@@ -695,6 +720,7 @@ int main(int argc, char **argv) {
     indexC = 0;
     char sendbuff[4096], recvbuff[4096];
     FD_ZERO(&fsetmaster);
+    Saldo=100;
 
     if (argc != 2) {
       fprintf(stderr, "usage: %s <IPaddress>\n", argv[0]);
@@ -727,6 +753,7 @@ int main(int argc, char **argv) {
     while (1) {
 
       pthread_mutex_lock(&mutex_choice);
+      printf("SALDO= %d\n",Saldo );
       pthread_create(&thread_menu, NULL, menu_exec, NULL);
       pthread_join(thread_menu, NULL);
       sleep(2);

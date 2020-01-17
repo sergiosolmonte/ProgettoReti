@@ -81,11 +81,7 @@ fd_set appFset;
 struct floodPack Fpack;
 
 // void sendMoney(void *);
-/*
 
-    BISOGNA VEDERE CHE COSA  È LA FUNCTRION epoll()  E I SUOI RELATIVI CAZZI
-
-*/
 // GESTIONE RICHIESTE DI CONNESSIONE IN ENTRATA
 void *peerAccept(void *arg) {
 
@@ -410,6 +406,7 @@ void *Gestione(void *arg) {
 
     //  printf("MAXFD %d\n",maxfd);
     if (o_select != 0) {
+      //Controlliamo tutti i descrittori nell'fset
       for (indice = listenfd + 1; indice <= maxfd; indice++) {
 
         if (FD_ISSET(indice, &appFset)) {
@@ -534,7 +531,7 @@ void *Gestione(void *arg) {
                                           }
                                           if(ptr==punt && ptr->pnext==NULL){
 
-                                             //ptr->stateP=ptr->stateP-Fpackapp.saldoT; 
+                                             //ptr->stateP=ptr->stateP-Fpackapp.saldoT;
                                            }
                                            else if(ptr==punt && ptr->pnext!=NULL){
                                              ptr->stateP=ptr->stateP+Fpackapp.saldoT;
@@ -572,7 +569,7 @@ void *Gestione(void *arg) {
     return 0;
   }
 
-  void *openPort(void *arg) {
+void *openPort(void *arg) {
 
     int choice;
 
@@ -617,7 +614,7 @@ void *Gestione(void *arg) {
     exit(0);
   }
 
-  void *channelConnect(void *arg) {
+void *channelConnect(void *arg) {
 
     int keyC, appFD;
     int control;
@@ -666,7 +663,7 @@ void *Gestione(void *arg) {
     return 0;
   }
 
-  void *menu_exec(void *arg) {
+void *menu_exec(void *arg) {
 
     printf("CIAO PEER %c/%d, Premi: \n 1) Per collegarti ad un Peer\n 2) Per "
            "visualizzare i peer disponibili \n ",
@@ -701,7 +698,7 @@ void *Gestione(void *arg) {
     return 0;
   }
 
-  int main(int argc, char **argv) {
+int main(int argc, char **argv) {
 
     initChannel();
     indexC = 0;
@@ -749,7 +746,7 @@ void *Gestione(void *arg) {
     exit(0);
   }
 
-  int searchArray(int port, struct floodPack a) {
+int searchArray(int port, struct floodPack a) {
     int j;
     for (j = 0; j < a.n_hops; j++) {
       if (port == a.hops[j])

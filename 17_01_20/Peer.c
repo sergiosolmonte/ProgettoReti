@@ -147,30 +147,53 @@ void *peerAccept(void *arg) {
 }
 
 void *trackerConnect(void *arg) {
+  struct timeval tv;
+  tv.tv_sec = 3;
+  tv.tv_usec = 0;
 
-  // pthread_create(&thread_gestione,NULL,Gestione,NULL);
-
+  if (setsockopt(sockudp, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
+    perror("Error");
+  }
+  int tentativi=0;
+  int z;
   while (1) {
-
     sendto(sockudp, &Pproto, sizeof(struct ping_protocol), 0,
            (struct sockaddr *)&servaddr, sizeof(servaddr));
-
+    tv.tv_sec = 3;
+    tv.tv_usec = 0;
     switch (Pproto.flag) {
 
     case 0:
       if (Pproto.lastPing == 0) {
-        // Sono un nuovo peer
-
-        recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
+        // Sono un nuovo
+          // Sono un nuovo peer
+          z = recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
+          if( z < 0 ) {
+            if(tentativi < 4) {
+                  if( errno == EWOULDBLOCK ) {
+                    printf("Timeout - Tracker is off\n");
+                    tentativi++;
+                    break;
+                }
+                else
+                  printf("errore in recvfrom");
+            }
+            else{
+              exit(0);
+            }
+        }
 
       } else {
         // PING SEMPLICE
         recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
-      }
-      break;
+        //z = recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
+
+    }
+      break; //break del case
 
     case 1:
       /* Richiesta lista peer disponibili*/
+
       free(ArrayPeers);
       recvfrom(sockudp, &size_peer, sizeof(int), 0, NULL,
                NULL); // riceve prima il size dell'array
@@ -471,7 +494,7 @@ void *Gestione(void *arg) {
         //REACHED==0
         else{
                if (Fpackapp.hops[0] == Pproto.rec_port){ // SONO IL MITTENTE MA NON HO TROVATO IL PEER/STABILITO LA CONNESSIONE
-                     printf("SONO IL MITTENTE E NON HO TROVATO PASSANDO PER %c\n", Fpackapp.hops[1]);                           // O_PEERNONTROVMITT
+                     printf("SONO IL MITTENTE E NON HO TROVATO PASSANDO PER %d\n", Fpackapp.hops[1]);                           // O_PEERNONTROVMITT
                      TRANSACTION *ptr;
                      ptr = searchChannel(Fpackapp.hops[1]);
                      Fpack=Fpackapp;
@@ -735,7 +758,8 @@ int main(int argc, char **argv) {
     scanf("%d", &Pproto.rec_port);
     Pproto.lastPing = 0;
     Pproto.flag = 0;
-
+    //tv.tv_sec=3;
+    //tv.tv_usec=0;
     pthread_create(&thread_peer, NULL, trackerConnect, NULL);
     recvfrom(sockudp,&hashRes,sizeof(int),0,NULL,NULL);
 

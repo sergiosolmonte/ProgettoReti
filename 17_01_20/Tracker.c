@@ -73,7 +73,7 @@ void *insert_peers(void *arg) {
       }
       else{ //altrimenti no
           hashRes=0;
-          sendto(sock, &hashRes, sizeof(struct ping_protocol), 0,(struct sockaddr *)&in, len);
+          sendto(sock, &hashRes, sizeof(int), 0,(struct sockaddr *)&in, len);
           pthread_mutex_unlock(&mutex_ping);
       }
 

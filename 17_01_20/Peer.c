@@ -304,7 +304,7 @@ void *peerConnect(void *arg) {
       }
 
       if(Fpack.reached==0){
-        printf("\nIMPOSSIBILE SCAMBIARE, VERRÀ CREATO UNO STATE CHANNEL \n");
+        printf("\nPERCORSO NON TOVATO, VERRÀ CREATO UNO STATE CHANNEL \n");
 
       }
       if (amount == 0) {
@@ -471,7 +471,7 @@ void *Gestione(void *arg) {
         //REACHED==0
         else{
                if (Fpackapp.hops[0] == Pproto.rec_port){ // SONO IL MITTENTE MA NON HO TROVATO IL PEER/STABILITO LA CONNESSIONE
-                     printf("SONO IL MITTENTE E NON HO TROVATO\n" );                           // O_PEERNONTROVMITT
+                     printf("SONO IL MITTENTE E NON HO TROVATO PASSANDO PER %c\n", Fpackapp.hops[1]);                           // O_PEERNONTROVMITT
                      TRANSACTION *ptr;
                      ptr = searchChannel(Fpackapp.hops[1]);
                      Fpack=Fpackapp;

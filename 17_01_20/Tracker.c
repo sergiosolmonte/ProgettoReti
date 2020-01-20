@@ -67,7 +67,7 @@ void *insert_peers(void *arg) {
         changeValue(Peer.rec_port,start,Peer.name);   //Nella funzione has.h serve ad aggiornare il ping
         i++;
         hashRes=1;
-        sendto(sock, &hashRes, sizeof(struct ping_protocol), 0,(struct sockaddr *)&in, len);
+        sendto(sock, &hashRes, sizeof(int), 0,(struct sockaddr *)&in, len);
         sendto(sock, &Peer, sizeof(struct ping_protocol), 0,(struct sockaddr *)&in, len);
         pthread_mutex_unlock(&mutex_ping);
       }

@@ -159,7 +159,7 @@ void *trackerConnect(void *arg) {
   while (1) {
     sendto(sockudp, &Pproto, sizeof(struct ping_protocol), 0,
            (struct sockaddr *)&servaddr, sizeof(servaddr));
-    tv.tv_sec = 3;
+    tv.tv_sec = 5;
     tv.tv_usec = 0;
     switch (Pproto.flag) {
 
@@ -242,7 +242,7 @@ void *peerConnect(void *arg) {
   struct sockaddr_in toPeer;
   TRANSACTION *app4;
   int connfd, control = 0;
-  pthread_mutex_lock(&mutex_controllo);
+//  pthread_mutex_lock(&mutex_controllo);
 
   fflush(stdin);
   printf("\nInserisci la porta del peer al quale vuoi connetterti\n");
@@ -250,9 +250,12 @@ void *peerConnect(void *arg) {
   scanf("%d", &porta);
 
   app4 = searchChannel(porta);
+  printf("Oh Oh Teletype\n");
 
+  //pthread_mutex_unlock(&mutex_controllo);
   Pproto.flag = 2;
-  pthread_mutex_lock(&mutex_controllo);
+  sleep(2);
+  //pthread_mutex_lock(&mutex_controllo);
 
   if(porta==Pproto.rec_port){
     control=0;
@@ -265,7 +268,7 @@ void *peerConnect(void *arg) {
       } // NELL'ULTIMA CONNESSIONE AL TRAKER ESISTE QUELLA PORTA 1 controllo
     }
   }
-
+  //pthread_mutex_unlock(&mutex_controllo);
   if (control == 1) {
     // SE ESISTE QUESTO PEER
     if (app4 != NULL) { // 2 controllo
@@ -277,12 +280,12 @@ void *peerConnect(void *arg) {
 
       TRANSACTION *appInter = channels->pnext;
 
-      pthread_mutex_lock(&mutex_flooding);
+
       printf("Quanto vuoi scambiare? (ALT>0)\n");
       scanf("%d", &amount);
 
       Fpack.dest_port = porta;
-      Fpack.n_hops = 0;
+
       Fpack.hops[0] = Pproto.rec_port;
       Fpack.saldoT = amount;
       Fpack.reached = 0;
@@ -291,11 +294,18 @@ void *peerConnect(void *arg) {
       //Controllo i miei state channels
       while (appInter != NULL) {
 
+        Fpack.n_hops = 0;
+
         if (appInter->stateP >= Fpack.saldoT){
             write(appInter->fd, &Fpack, sizeof(struct floodPack));
+            pthread_mutex_lock(&mutex_flooding);
+        }
+        else{
+              printf("SENZA ALT SUL CANALE CON %c \n",appInter->id );
         }
 
-        pthread_mutex_lock(&mutex_flooding);
+
+
 
         if (Fpack.reached == 1) {
 
@@ -311,15 +321,17 @@ void *peerConnect(void *arg) {
           return 0;
 
         } else { // SE REACHED==0
-
+            printf("\nSCORRO LE ADIACENZE\n" );
           appInter = appInter->pnext; // PASSO AL PROSSIMO STATE
         }
       }
 
     }
-    else if (indexC == 0 || Fpack.reached == 0) { // CASO IN CUI NON HO ANCORA EFFETTUATO NESSUNA
-                        // CONNESSIONE INDEXC=0 OPPURE SE LA RICERCA NON HA
-                        // TROVATO UN CAMMINO REACHED=0
+
+
+      if (indexC == 0 || Fpack.reached == 0) { // CASO IN CUI NON HO ANCORA EFFETTUATO NESSUNA
+                                                  // CONNESSIONE INDEXC=0 OPPURE SE LA RICERCA NON HA
+                                                  // TROVATO UN CAMMINO REACHED=0
 
       if ((socktcp = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         fprintf(stderr, "socket error");
@@ -437,6 +449,7 @@ void *Gestione(void *arg) {
             TRANSACTION *ptr= searchChannel(portApp);
             Saldo=Saldo+ptr->stateP;
             DELchannels(portApp);
+            pthread_mutex_unlock(&mutex_choice);
           }
           else{
 
@@ -455,6 +468,8 @@ void *Gestione(void *arg) {
             Fpackapp.reached = 1;
             //Invio la risposta al descrittore dal quale ho ricevuto il pacchetto
             write(indice, &Fpackapp, sizeof(struct floodPack));
+            pthread_mutex_unlock(&mutex_choice);
+            //pthread_mutex_unlock(&mutex_controllo);
           }
           //Se il pacchetto è già arrivato al destinatario
           else if(Fpackapp.reached==1){
@@ -476,7 +491,9 @@ void *Gestione(void *arg) {
                   int p;
 
                   for (p = 0; p <= Fpackapp.n_hops; p++) {
+                      printf("\n\tp: %d\n",p );
                       if (Fpackapp.hops[p] == Pproto.rec_port){
+                        printf("%d\n",Fpackapp.hops[p] );
                         break;
                       }
                   }
@@ -488,6 +505,8 @@ void *Gestione(void *arg) {
                   printf("IL MIO PREDECESSORE È %c\n",ptr->id );
 
                   write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
+                  pthread_mutex_unlock(&mutex_choice);
+                  //pthread_mutex_unlock(&mutex_controllo);
                }
 
         }
@@ -495,13 +514,12 @@ void *Gestione(void *arg) {
         else{
                if (Fpackapp.hops[0] == Pproto.rec_port){ // SONO IL MITTENTE MA NON HO TROVATO IL PEER/STABILITO LA CONNESSIONE
                      printf("SONO IL MITTENTE E NON HO TROVATO PASSANDO PER %d\n", Fpackapp.hops[1]);                           // O_PEERNONTROVMITT
-                     TRANSACTION *ptr;
-                     ptr = searchChannel(Fpackapp.hops[1]);
                      Fpack=Fpackapp;
                      Fpack.reached = 0;
                      pthread_mutex_unlock(&mutex_flooding);
                }
                else{ //SE NON SONO IL MITTENTE ALLORA SONO UN INTERMEDIARIO
+
                      printf("SONO UN INTERMEDIARIO,REACHED 0 ciao %c porta richiesta: %d \n", Pproto.name,Fpackapp.dest_port);
 
                      TRANSACTION *ptr;
@@ -514,10 +532,11 @@ void *Gestione(void *arg) {
                           }
                       }
 
-                     //GIÀ È PASSATO PER ME MA NON HA TROVATO, DEVE TOGLIERE A QUELLO DI PRIMA E METTERE A QUELLO DI DOPO
+
                      if(cisono==1){
                          TRANSACTION *ptr;
                          ptr = searchChannel(Fpackapp.hops[p-1]);
+                         printf("SONO INTERMEDIARIO E STO TORNANDO INDIETRO\n" );
                          write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
                      }
                       else{ //NON CI SONO NEGLI HOPS IL PACCHETTO DEVE AVANZARE
@@ -527,7 +546,7 @@ void *Gestione(void *arg) {
 
                                 Fpackapp.n_hops++;
                                 Fpackapp.hops[Fpackapp.n_hops]=Pproto.rec_port;
-                                punt=searchChannel(Fpackapp.hops[Fpackapp.n_hops]);
+                                punt=searchChannel(Fpackapp.hops[Fpackapp.n_hops-1]);
                                 ptr=searchChannel(Fpackapp.dest_port);
 
                                 //Se ho uno state channel con il destinatario
@@ -541,6 +560,7 @@ void *Gestione(void *arg) {
 
                                         }
                                         else { // SE NON HO SALDO SUFFICIENTE
+                                          printf("SENZA ALT SULLO STATE CHANNEL\n" );
                                           ptr = searchChannel(Fpackapp.hops[Fpackapp.n_hops-1]);
                                           write(ptr->fd, &Fpackapp,sizeof(struct floodPack));
                                                                                               /*Ricerco il mio predecessore nei
@@ -549,23 +569,27 @@ void *Gestione(void *arg) {
                                   }
                                   else{ //NON HO UN COLLEGAMENTO DIRETTO CON IL PEER  DESTINATARIO RICHEISTO
                                       ptr=channels->pnext;
+
                                       while(ptr!=NULL){
-                                          if(ptr==channels->pnext && ptr->pnext==NULL){
-                                              write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
-                                          }
+                                        //  if(ptr->port!=Fpackapp.hops[0]){
 
-                                           if(ptr!=punt){
-                                             //ptr->stateP=ptr->stateP-Fpackapp.saldoT;
-                                             write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
-                                           }
-                                           ptr=ptr->pnext;
+                                                if(ptr==channels->pnext && ptr->pnext==NULL){
+                                                    write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
+                                                }
+
+                                                 if(ptr!=punt){
+                                                   //ptr->stateP=ptr->stateP-Fpackapp.saldoT;
+                                                   write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
+                                                 }
+
+                                                 ptr=ptr->pnext;
+
+                                        //  }
                                        }
-
-
                                   }
 
                                 }
-                                else{ //SUPERATO LIMITE DI HOPS
+                                else{ //SUPERATO LIMITE DI HOPS >3
                                       TRANSACTION *ptr;
                                       ptr=searchChannel(Fpackapp.hops[3]);
                                       Fpackapp.n_hops++;
@@ -573,11 +597,13 @@ void *Gestione(void *arg) {
                                       write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
                                 }
                      }
+                     pthread_mutex_unlock(&mutex_choice);
+                    // pthread_mutex_unlock(&mutex_controllo);
                }
         }
         }
 
-          pthread_mutex_unlock(&mutex_choice);
+
           }
 
         }
@@ -766,7 +792,7 @@ int main(int argc, char **argv) {
     if(hashRes==1){
     pthread_create(&thread_receive, NULL, openPort, NULL);
     pthread_create(&thread_gestione, NULL, Gestione, NULL);
-
+    pthread_mutex_lock(&mutex_flooding);
     system("clear");
     while (1) {
 

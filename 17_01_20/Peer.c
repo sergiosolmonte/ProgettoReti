@@ -250,8 +250,7 @@ void *peerConnect(void *arg) {
   scanf("%d", &porta);
 
   app4 = searchChannel(porta);
-  printf("Oh Oh Teletype\n");
-
+  
   //pthread_mutex_unlock(&mutex_controllo);
   Pproto.flag = 2;
   sleep(2);

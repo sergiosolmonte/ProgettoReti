@@ -301,11 +301,8 @@ void *peerConnect(void *arg) {
             pthread_mutex_lock(&mutex_flooding);
         }
         else{
-              printf("SENZA ALT SUL CANALE CON %c \n",appInter->id );
+              printf("ALT INSUFFICIENTI SUL CANALE CON %c \n",appInter->id );
         }
-
-
-
 
         if (Fpack.reached == 1) {
 
@@ -491,9 +488,7 @@ void *Gestione(void *arg) {
                   int p;
 
                   for (p = 0; p <= Fpackapp.n_hops; p++) {
-                      printf("\n\tp: %d\n",p );
                       if (Fpackapp.hops[p] == Pproto.rec_port){
-                        printf("%d\n",Fpackapp.hops[p] );
                         break;
                       }
                   }
@@ -553,7 +548,7 @@ void *Gestione(void *arg) {
                                 if (ptr != NULL) {
                                       if (ptr->stateP >= Fpackapp.saldoT) { // Se ho saldo disponibile sul canale
                                                                             // con il destinatario, faccio flooding in avanti
-                                        printf("HO SALDO E COMUNCIO CON %c \n",ptr->id);
+                                        printf("HO SALDO E COMUNICO CON %c \n",ptr->id);
                                         //ptr->stateP = ptr->stateP - Fpackapp.saldoT;
                                         //punt->stateP=punt->stateP+Fpackapp.saldoT;
                                         write(ptr->fd, &Fpackapp, sizeof(struct floodPack));

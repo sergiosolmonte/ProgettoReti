@@ -1,0 +1,109 @@
+\documentclass[a4paper,12pt]{extarticle}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\graphicspath{ {./images/} }
+\usepackage{geometry}
+\usepackage{mathtools}
+\usepackage{mathrsfs}
+
+\geometry{a4paper,left=3.5cm,right=3.5cm,top=2.5cm,bottom=2.5cm}
+
+\def\course{Corso: Reti di Calcolatori}     %Course
+\def\thetitle{State Channels}               % Report Title
+\def\Headauthor{last name et al.}           % Header Authors
+\def\date{\today}                           % Date
+
+\begin{document}
+
+\begin{center}
+    
+    % Logo
+    \includegraphics[scale = 2.0]{P.jpg}\\[1.5cm]
+    \huge{Università degli Studi di Napoli Parthenope}\\ [1cm]
+    \textsc{\Large{\course}}\\[.5cm]
+    \textsc{\Large{\thetitle}}\\[.5cm]
+    \textsc{\Large\date}\\[2cm]
+    \Large{
+    \vspace{1cm}
+    \begin{tabular}{l   r}
+        \textit{Autore} &  \textit{Matricola}\\
+        \hline
+        % author names and Matricola
+        Altobelli Andrea & 0000000001 \\
+        Cozzolino Raoul & 0124001690 \\
+        Solmonte Sergio & 0124001785 \\ 
+    \end{tabular}
+    }
+\end{center}
+
+\newpage
+\renewcommand{\contentsname}{Indice}
+\tableofcontents{}
+\newpage
+
+\section {Descrizione del Progetto}
+\vspace{.5cm}
+\subsection {Descrizione State Channel}
+Uno state channel è un canale tra due peer in grado di conservare uno stato
+finchè non viene chiuso. In particolare, lo stato del canale è costituito dal
+bilancio dei due peer in seguito allo scambio di valuta digitale. La quantità
+di valuta digitale contenuta all’interno del canale è stabilita dai due peer al
+momento della creazione del canale.
+Per aprire un canale \textit{Ch(A, B)}, il peer A invia al peer B una richiesta di
+creazione del canale con la quantità x \textsubscript{AB}  che intende impegnare nel canale.
+Alla ricezione della richiesta, il peer B può accettare o meno di aprire il
+canale. In caso affermativo decide la quantità x \textsubscript{BA}  che intende impegnare
+nel canale (anche 0). Una volta creato il canale, A e B possono scambiarsi
+valuta. Ad esempio:
+\begin{itemize}
+  \item A richiede a B di creare un canale ed impegna x\textsubscript{AB} = 10
+  \item B accetta la creazione del canale ed impegna x\textsubscript{BA} = 5
+  \item Nello stato iniziale A potrà trasferire a B fino a 10 unità di valuta mentre B potrà trasferire ad A fino a 5 unità di valuta
+  \item A trasferisce 5 unità a B, il nuovo stato del canale sarà           x\textsubscript{AB} = 5 ed x\textsubscript{BA} = 10
+  \item Nel nuovo stato A potrà trasferire a B fino a 5 unità di valuta mentre B potrà trasferire ad A fino a 10 unità di valuta
+  \item B trasferisce 3 unità ad A, il nuovo stato del canale sarà x\textsubscript{AB} = 8 ed x\textsubscript{BA} = 7
+  \item nel nuovo stato A potrà trasferire a B fino a 8 unità di valuta mentre B potrà trasferire ad A fino a 7 unità di valuta
+  \item ecc..
+  
+\end{itemize}
+
+\section {Descrizione dell'Architettura}
+\vspace{.5cm}
+\subsection {Peer to peer}
+
+\section {Potocollo Applicazione}
+\vspace{.3cm}
+\subsection {Protocolli utilizzati nel Tracker}
+
+Il protocollo principale che gestisce le comuncazioni tra peer e tracker è formato da 4 campi :\\ \textbf{name} è un carattere che definisce appunto il nome del nostro peer.\\ \textbf{rec\_port} è la porta scelta in fase di connessione dal peer su cui riceverà \\le richieste di connessione.
+Questo parametro indentifica univocamente un\\ determinato Peer. Attraverso vari controlli due Peer non possono avere la stessa porta di ricezione, ma possono avere lo stesso nome. \\ \textbf{last\_ping} è il parametro che contiene il tempo di accesso al Tracker da parte di un determinato Peer, costantemente aggiornato ogni 2 secondi. Quando questo parametro è nullo (last\_ping=0), il Tracker capisce che quella connessione è stata effettuata da un nuovo Peer e lo inserisce nella sua hashTable contenente tutti i Peer online\\
+\textbf{flag} è, come si intuisce dal nome, un parametro che serve a capire l'obbiettivo della comunicazione tra Peer e Tracker. Questi flag vengono definiti così: \\ \\
+
+\begin{tabular}[t]{|c | c  |}
+\hline
+\textit{Valore flag} &  \textit{Risultato}\\
+\hline
+         & Utilizzato per effettuare un semplice ping da parte\\0 & del Peer, cioè inviare se stesso al tracker e \\& ricevere un last\_ping aggiornato.\\
+        \hline
+         & Quando un Peer invia questo flag, il Tracker capisce \\1 & che deve inviare la lista dei Peer online,\\&cioè con un ping aggiornato di recente.\\
+        \hline
+         & Utilizzato quando un Peer deve controllare l'esistenza \\2 & e il collegamento con il Tracker di un altro Peer \\& con cui vuole avere una comuncazione\\
+        \hline
+\end{tabular}
+\vspace{1cm}
+\subsection{Protocolli utilizzati nel Peer}
+Nel Peer vengono utilizzati tre protocolli: \textit{ping\_protocol}, \textit{Transaction} e \textit{floodPack}.\\ Il primo vine utilizzato nella creazione e gestione della comunicazione con il Tracker, composto anche lui da \textbf{name}, \textbf{rec\_port}, \textbf{last\_ping}, \textbf{flag}.\\ \\
+Il \underline{Transaction} è il protocollo utilizzato nella creazione e gestione degli \textit{State Channels}.\\ Ogni State Channel è composto da: \\un descrittore del canale utilizzato per la comunicazione ( \textbf{fd} ).\\Un nome identificativo e la porta di ricezione scelta del Peer con il quale sto comunicando( \textbf{id} e \textbf{port} ).\\ Infine lo stato del canale ( \textbf{stateP} ), che rappresenta la massima quantita della nostra unità di misura che il Peer può inviare al destinatario o la massima quantita che può essere scambiata attraverso quel canale se un altro Peer lo utilizza come intermediario.\\ \\
+Il \underline{floodPack} è invece utilizzato nelle comunicazioni dirette o indirette tra Peer.\\ Si compone di 5 campi che ad ogni creazione di una comunicazione vengono azzerati:\\ La \textbf{dest\_port} rappresenta la porta verso cui è diretta un pacchetto di questo tipo; più semplicemente indica il destinatario della connessione.\\L'array \textbf{hops} contiene al suo interno tutti i Peer che abbiamo attraversato per arrivare al destinatario; ogni salto fa aumentare la variabile \textbf{n\_hops} che appunto è il nostro contatore di Peer intermediari.\\ La variabile \textbf{saldoT} rappresenta appunto la quantità di moneta da trasferire da un Peer ad un altro, ad ogni hop viene confrontata con il saldo sul canale che sta attraversando per capire da subito se può utilizzare quel passsaggio o meno.\\L'ultimo elemento è la variabile \textbf{reached} che viene impostata a 1 quando il pacchetto raggiunge il Peer che ha la sua porta di ricezione uguale a \textit{dest\_port}; questa variabile è molto importante nelle connessioni attraverso intermediari che serve a fr capire ai vari Peer presi in cosiderazione se il pacchetto deve andare in avanti verso \textit{dest\_port} o all'indietro verso \textit{hops[0]}.\\ \\
+
+\section {Dettagli Implementativi}
+\subsection{Dettagli Peer}
+
+
+
+\subsection{Dettagli Tracker}
+Il Tracker ha il compito fondamentale di controllare la presenza di un Peer, di aggiornare ogni ping periodicamente in modo tale da capire chi è attivo e chi ormai non lo è più, e di riferire tali informazioni ai Peer che le richiedono.
+Queste operazioni vengono svolte da alcuni thread 
+
+\end{document}
+

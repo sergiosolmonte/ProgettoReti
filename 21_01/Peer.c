@@ -170,8 +170,11 @@ void *trackerConnect(void *arg) {
   int tentativi=0;
   int z;
   while (1) {
-    sendto(sockudp, &Pproto, sizeof(struct ping_protocol), 0,
-           (struct sockaddr *)&servaddr, sizeof(servaddr));
+    sendto(sockudp, &Pproto, sizeof(struct ping_protocol), 0,(struct sockaddr *)&servaddr, sizeof(servaddr));
+
+
+
+
 
     switch (Pproto.flag) {
 
@@ -202,8 +205,22 @@ void *trackerConnect(void *arg) {
 
       } else {
         // PING SEMPLICE
-        recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
-        //z = recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
+        //recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
+        z = recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
+        if( z < 0 ) {
+          if(tentativi < 4) {
+                if( errno == EWOULDBLOCK || errno==EAGAIN) {
+                  printf("Timeout - Tracker is off\n");
+                  tentativi++;
+                  break;
+              }
+              else
+                printf("errore in recvfrom");
+          }
+          else{
+            exit(0);
+          }
+      }
 
     }
       break; //break del case
@@ -214,12 +231,8 @@ void *trackerConnect(void *arg) {
       free(ArrayPeers);
       recvfrom(sockudp, &size_peer, sizeof(int), 0, NULL,
                NULL); // riceve prima il size dell'array
-      ArrayPeers =
-          realloc(ArrayPeers, size_peer * sizeof(struct ping_protocol));
-      recvfrom(
-          sockudp, ArrayPeers, size_peer * sizeof(struct ping_protocol), 0,
-          NULL,
-          NULL); // e poi i peer  direttamente dalla hash conenuta nel traker
+      ArrayPeers =malloc(size_peer * sizeof(struct ping_protocol));
+      recvfrom(sockudp, ArrayPeers, size_peer * sizeof(struct ping_protocol), 0,NULL,NULL); // e poi i peer  direttamente dalla hash conenuta nel traker
                  // che essendo già un puntatore ad una struct
                  // non necessita di un indirizzamento
       printf("\tLista Peers Disponibili\n");
@@ -246,8 +259,8 @@ void *trackerConnect(void *arg) {
     }
 
 
-    tv.tv_sec = 3;
-    tv.tv_usec = 0;
+    //tv.tv_sec = 3;
+    //tv.tv_usec = 0;
       sleep(2);
   }
   return 0;

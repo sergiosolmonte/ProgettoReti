@@ -368,7 +368,7 @@ void *peerConnect(void *arg) {
       }
 
       if(Fpack.reached==0){
-        printf("\nPERCORSO NON TOVATO, VERRÀ CREATO UNO STATE CHANNEL \n");
+        printf("\nPERCORSO NON TROVATO, VERRÀ CREATO UNO STATE CHANNEL \n");
 
       }
       if (amount == 0) {

@@ -17,21 +17,21 @@
 #define FALSE 0
 #define TRUE 1
 
-struct ping_protocol {
+struct ping_protocol { //PROTOCOLLO COMUNICAZIONE TRACKER
   char name;
   int rec_port;
   clock_t lastPing;
   int flag;
 };
 
-struct Transaction {
+struct Transaction { //PROTOCOLLO DI UNO STATE CHANNEL
   int fd;
   char id;
   int port;
   int stateP;
 };
 
-struct floodPack {
+struct floodPack {  //PROTOCOLLO DI COMUNICAZIONE SU UNO STATE CHANNEL
   int dest_port;
   int n_hops;
   int hops[5];
@@ -736,6 +736,9 @@ void *channelConnect(void *arg) {
 
       system("clear");
       printf("Canale %d con %c chiuso correttamente\n", appFD, appID);
+      pthread_cancel(thread_action);
+      pthread_mutex_unlock(&mutex_controllo);
+      pthread_mutex_unlock(&mutex_choice);
       //printf("SALDO TOTALE = %d\n", Saldo );
       break;
     }

@@ -87,6 +87,7 @@ fd_set exceptfds;
 struct floodPack Fpack;
 struct timeval tim;
 struct timeval tv;
+TRANSACTION * trackerOff;
 
 
 
@@ -196,6 +197,13 @@ void *trackerConnect(void *arg) {
                   printf("errore in recvfrom");
             }
             else{
+                if(indexC>0) //RIPRISTINA IL SALDO GENERALE CON QUELLO IMPEGNATO DURANTE LE TRANSAZIONI TRA PEER
+                {  trackerOff=channels->pnext;
+                  for(i=0;i<indexC;i++){
+                    Saldo=Saldo+trackerOff->stateP;
+                  }
+                }
+                printf("SALDO FINALE COMUNICAZIONE = %d \n\n", Saldo);
               exit(0);
             }
         }

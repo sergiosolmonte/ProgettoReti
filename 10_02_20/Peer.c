@@ -79,6 +79,7 @@ char recvline[1025];
 char recvline2[1025];
 struct sockaddr_in servaddr, peer_list[10];
 int control = 1, port;
+int traspAmount; //viene utilizzata nel caso in cui retval=-1 , per evitare che nella peerconnect ci viene richiesto
 struct ping_protocol Pproto;
 struct ping_protocol *ArrayPeers;
 fd_set fsetmaster;
@@ -276,6 +277,7 @@ void *peerConnect(void *arg) {
 
   int porta;
   int amount = 0;
+  traspAmount=0;
   int j, indice = 0;
   in_port_t porta_request;
   struct sockaddr_in toPeer;
@@ -318,7 +320,7 @@ void *peerConnect(void *arg) {
       pthread_join(thread_channel, &retValue);
       retV=*(int*)retValue;  //per ottenere il valore di ritorno dalla thread_join nel tentativo di scambio diretto, cosi prima di creare un nuovo state
       // vede se ci può arrivare tramite i suoi collegamenti
-      printf("\nRETVALUE = %d\n",retV ); //retV = -1 se lo scambio su di un canale già attivo non avviene e =0 se riesce (tutto questo nella channelConnect)
+      //printf("\nRETVALUE = %d\n",retV ); //retV = -1 se lo scambio su di un canale già attivo non avviene e =0 se riesce (tutto questo nella channelConnect)
 
     }
 
@@ -326,10 +328,13 @@ void *peerConnect(void *arg) {
     if (indexC != 0 && retV!=1) { // HO DEGLI STATE CHANNEL APERTI E PROVERO A VEDERE SE LI POSSO USARE
 
       TRANSACTION *appInter = channels->pnext;
+      amount=traspAmount;
 
-
-      printf("Quanto vuoi scambiare? (ALT>0)\n");
+      while(amount==0){
+      printf("Quanto vuoi scambiare? (ALT>0)\n AMOUNT = ");
+      fflush(stdin);
       scanf("%d", &amount);
+      }
 
       Fpack.dest_port = porta;
 
@@ -385,7 +390,16 @@ void *peerConnect(void *arg) {
 
       if (indexC == 0 || Fpack.reached == 0) {    // CASO IN CUI NON HO ANCORA EFFETTUATO NESSUNA
                                                   // CONNESSIONE INDEXC=0 OPPURE SE LA RICERCA NON HA
-                                                  // TROVATO UN CAMMINO REACHED=0
+                                                  // TROVATO UN CAMMINO REACHED=0 E NON HO UNA CONNESSIONE DIRETTA ATTIVA
+                                                  //CON QUEL PEER
+      if(app4!=NULL){
+
+          printf("\nDEVI PRIMA CHIUDERE IL CANALE N. %d APERTO CON %c SULLA PORTA %d PER POTER IMPEGNARE QUESTA SOMMA\n",app4->fd,app4->id, app4->port );
+          pthread_mutex_unlock(&mutex_controllo);
+          pthread_mutex_unlock(&mutex_choice);
+          return 0;
+
+      }
 
           if ((socktcp = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
             fprintf(stderr, "socket error");
@@ -396,14 +410,16 @@ void *peerConnect(void *arg) {
         printf("\nPERCORSO NON TROVATO, VERRÀ CREATO UNO STATE CHANNEL \n");
 
       }
+      while(amount==0){
       if (amount == 0) {
         printf("\nQUANTI ALT VUOI IMPEGNARE? \n(amount>0)\n AMOUNT = ");
+        fflush(stdin);
         scanf("%d", &amount);
       }
-
+    }
       if(amount>Saldo){
 
-        printf("IMPOSSIBILE CREARE PER SALDO INSUFFICIENTE");
+        printf("\nIMPOSSIBILE CREARE PER SALDO INSUFFICIENTE\n");
         pthread_mutex_unlock(&mutex_controllo);
         pthread_mutex_unlock(&mutex_choice);
         return 0;
@@ -758,6 +774,7 @@ void *channelConnect(void *arg) {
       } else {
         system("clear");
         printf("NON PUOI EFFETTUARE QUESTO MOVIMENTO, FONDI SUL CANALE INSUFFICIENTI\n");
+        traspAmount=appAmount;
         retValue=-1;
       }
 
@@ -784,7 +801,7 @@ void *channelConnect(void *arg) {
                 pthread_mutex_unlock(&mutex_controllo);
                 break;
     }
-    printf("ReTval dopo case %d\n",retValue);
+    //printf("ReTval dopo case %d\n",retValue);
     if(retValue==-1){
       //pthread_cancel(thread_action);
       //pthread_mutex_unlock(&mutex_choice);

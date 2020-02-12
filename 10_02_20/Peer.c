@@ -213,7 +213,7 @@ void *trackerConnect(void *arg) {
 
       } else {
         // PING SEMPLICE
-       
+
         z = recvfrom(sockudp, &Pproto, sizeof(struct ping_protocol), 0, NULL, NULL);
         if( z < 0 ) {
           if(tentativi < 4) {
@@ -289,10 +289,10 @@ void *peerConnect(void *arg) {
 
   app4 = searchChannel(porta);
 
-  
+
   Pproto.flag = 2;
   sleep(2);
- 
+
 
   if(porta==Pproto.rec_port){
     control=0;
@@ -305,7 +305,7 @@ void *peerConnect(void *arg) {
       } // NELL'ULTIMA CONNESSIONE AL TRAKER ESISTE QUELLA PORTA 1 controllo
     }
   }
-  
+
   if (control == 1) {
     // SE ESISTE QUESTO PEER
     if (app4 != NULL) { // 2 controllo
@@ -603,20 +603,20 @@ void *Gestione(void *arg) {
                                       ptr=channels->pnext;
 
                                       while(ptr!=NULL){
-                                        
+
 
                                                 if(ptr==channels->pnext && ptr->pnext==NULL){
                                                     write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
                                                 }
 
                                                  if(ptr!=punt){
-                                                  
+
                                                    write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
                                                  }
 
                                                  ptr=ptr->pnext;
 
-                                      
+
                                        }
                                   }
 
@@ -630,7 +630,7 @@ void *Gestione(void *arg) {
                                 }
                      }
                      pthread_mutex_unlock(&mutex_choice);
-                   
+
                }
         }
         }
@@ -708,7 +708,7 @@ void *channelConnect(void *arg) {
     scanf("%d", &keyC);
     switch (keyC) {
     case 1:
-     
+
       printf("SALDO SU CANALE = %d ALT \n Quanto vuoi inviare? \n",
              app3->stateP); // CONTROLLO != NULL VEMIVA GIA FATTO NELLA PEER
                             // CONNECT
@@ -727,7 +727,7 @@ void *channelConnect(void *arg) {
         system("clear");
         printf("NON PUOI EFFETTUARE QUESTO MOVIMENTO, FONDI SUL CANALE INSUFFICIENTI\n");
       }
-       
+
       break;
     case 2:
       appFD = app3->fd;
@@ -741,13 +741,13 @@ void *channelConnect(void *arg) {
 
       system("clear");
       printf("Canale %d con %c chiuso correttamente\n", appFD, appID);
-      
+
       pthread_mutex_unlock(&mutex_controllo);
-    
+
       //printf("SALDO TOTALE = %d\n", Saldo );
       break;
 
-      case 3:   
+      case 3:
                 pthread_mutex_unlock(&mutex_controllo);
     }
     pthread_cancel(thread_action);
@@ -785,7 +785,7 @@ void *menu_exec(void *arg) {
       printChannels();
       printf("VUOI TERMINARE QUALCHE CANALE? \n 1) SI \n 2) NO\n");
       scanf("%d",&keyC);
-     
+
       if(keyC==1){
             fflush(stdin);
             printf("\n INSERIRE LA PORTA DEL CANALE DA CHIUDERE \n");
@@ -841,17 +841,17 @@ int main(int argc, char **argv) {
       fprintf(stderr, "inet_pton error for %s\n", argv[1]);
       exit(1);
     }
-  
+
     printf("INSERIRE NOME PEER\n");
     scanf("%c", &name);
   while(hashRes==0){
 
-    Pproto.name=name;  
+    Pproto.name=name;
     printf("QUALE PORTA USI PER RICEVERE?\n");
     scanf("%d", &Pproto.rec_port);
     Pproto.lastPing = 0;
     Pproto.flag = 0;
-    
+
 
     pthread_create(&thread_peer, NULL, trackerConnect, NULL);
     sleep(1);
@@ -859,13 +859,14 @@ int main(int argc, char **argv) {
     recvfrom(sockudp,&hashRes,sizeof(int),0,NULL,NULL);
     printf("ASPETTO DISPONIBILITÀ TRACKER\n" );
 
-    
+
 
     if(hashRes==1){
 
     pthread_create(&thread_receive, NULL, openPort, NULL);
     pthread_create(&thread_gestione, NULL, Gestione, NULL);
     pthread_mutex_lock(&mutex_flooding);
+    sleep(1); //per ottimizzazione grafica
     system("clear");
     while (1) {
 
@@ -903,4 +904,3 @@ int searchArray(int port, struct floodPack a) {
     }
     return 0;
   }
-

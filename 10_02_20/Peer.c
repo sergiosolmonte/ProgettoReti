@@ -144,8 +144,9 @@ void *peerAccept(void *arg) {
     printf("\nMI SONO COLLEGATO CON %c ALLA SUA PORTA %d\n",app2.id, app2.port);
 
   } else if (choice == 4) {
-    write(connfd, &choice, sizeof(int));
-    close(connfd);
+    write(fd, &choice, sizeof(int));
+
+    close(fd);
     system("clear");
     printf("Canale Chiuso\n");
   }
@@ -280,6 +281,9 @@ void *peerConnect(void *arg) {
   struct sockaddr_in toPeer;
   TRANSACTION *app4;
   int connfd, control = 0;
+  void *retValue;
+  int retV;
+
 
 
   fflush(stdin);
@@ -311,9 +315,15 @@ void *peerConnect(void *arg) {
     if (app4 != NULL) { // 2 controllo
       // Se sono già connesso a questa porta in uno state channel
       pthread_create(&thread_channel, NULL, channelConnect, &porta);
-      pthread_join(thread_channel, NULL);
+      pthread_join(thread_channel, &retValue);
+      retV=*(int*)retValue;  //per ottenere il valore di ritorno dalla thread_join nel tentativo di scambio diretto, cosi prima di creare un nuovo state
+      // vede se ci può arrivare tramite i suoi collegamenti
+      printf("\nRETVALUE = %d\n",retV ); //retV = -1 se lo scambio su di un canale già attivo non avviene e =0 se riesce (tutto questo nella channelConnect)
 
-    } else if (indexC != 0) { // HO DEGLI STATE CHANNEL APERTI E PROVERO A VEDERE SE LI POSSO USARE
+    }
+
+
+    if (indexC != 0 && retV!=1) { // HO DEGLI STATE CHANNEL APERTI E PROVERO A VEDERE SE LI POSSO USARE
 
       TRANSACTION *appInter = channels->pnext;
 
@@ -326,6 +336,16 @@ void *peerConnect(void *arg) {
       Fpack.hops[0] = Pproto.rec_port;
       Fpack.saldoT = amount;
       Fpack.reached = 0;
+
+      if(amount>Saldo){
+
+        printf("IMPOSSIBILE CREARE PER SALDO INSUFFICIENTE");
+        pthread_mutex_unlock(&mutex_controllo);
+        pthread_mutex_unlock(&mutex_choice);
+        return 0;
+
+
+      }
       // SE QUESTO PEER PUO ESSERE RAGGIUNTO DA UN MIO STATE CHANNEL
 
       //Controllo i miei state channels
@@ -381,6 +401,15 @@ void *peerConnect(void *arg) {
         scanf("%d", &amount);
       }
 
+      if(amount>Saldo){
+
+        printf("IMPOSSIBILE CREARE PER SALDO INSUFFICIENTE");
+        pthread_mutex_unlock(&mutex_controllo);
+        pthread_mutex_unlock(&mutex_choice);
+        return 0;
+
+
+      }
       toPeer = servaddr;
       porta_request = htons(porta);
       toPeer.sin_port = porta_request;
@@ -453,7 +482,8 @@ void *Gestione(void *arg) {
 
   struct floodPack Fpackapp;
   struct timeval timer;
-  int o_select, indice;
+  int o_select, indice,cisono,p;
+  TRANSACTION* ptr,*punt;
 
   while (1) {
 
@@ -480,7 +510,7 @@ void *Gestione(void *arg) {
             FD_CLR(indice,&fsetmaster);   //  INIZIALIZZATO A 0;
             indexC--;
             int portApp=getPort(indice);  //CERCO LA PORTA DA ELIMINARE NELLA LISTA ASSOCIATA A INDICE
-            TRANSACTION *ptr= searchChannel(portApp);
+            ptr= searchChannel(portApp);
             Saldo=Saldo+ptr->stateP;
             DELchannels(portApp);
             pthread_mutex_unlock(&mutex_choice);
@@ -491,7 +521,7 @@ void *Gestione(void *arg) {
           if (Fpackapp.dest_port == Pproto.rec_port) {
             system("clear");
             printf("===== CONNESSIONE STATE CHANNEL =====\n");
-            TRANSACTION *ptr;
+
 
             ptr = searchChannel(Fpackapp.hops[Fpackapp.n_hops]);
             //Accredito sullo state channel dal quale mi è arrivato il pacchetto FLOODPACK, il saldo che mi è stato inviato
@@ -509,7 +539,7 @@ void *Gestione(void *arg) {
           else if(Fpackapp.reached==1){
 
               if (Fpackapp.hops[0] == Pproto.rec_port){   //SE SONO IO QUELLO CHE HA RICHIESTO LA CONNESSIONE, DEVO SBLOCCARE IL MUTEX BLOCCATO NELLA PEER CONNECT
-                  TRANSACTION *ptr;
+
                   printf("MI È ARRIVATA LA RISPOSTA DA %d, HA RICEVUTO %d ALT\n",Fpackapp.dest_port, Fpackapp.saldoT);
                   ptr = searchChannel(Fpackapp.hops[1]);
                   ptr->stateP = (ptr->stateP) - Fpackapp.saldoT;
@@ -521,8 +551,8 @@ void *Gestione(void *arg) {
               //SONO UN INTERMEDIARIO E DEVO MANDARE IL PACCHETTO INDIETRO
               else{
                   printf("SONO UN INTERMEDIARIO, ciao %c porta richiesta: %d \n", Pproto.name,Fpackapp.dest_port);
-                  TRANSACTION *ptr;
-                  int p;
+
+
 
                   for (p = 0; p <= Fpackapp.n_hops; p++) {
                       if (Fpackapp.hops[p] == Pproto.rec_port){
@@ -554,10 +584,10 @@ void *Gestione(void *arg) {
 
                      printf("SONO UN INTERMEDIARIO,REACHED 0 ciao %c porta richiesta: %d \n", Pproto.name,Fpackapp.dest_port);
 
-                     TRANSACTION *ptr;
-                     int cisono=0,p;
 
-                     for (p = 0; p == Fpackapp.n_hops; p++) {
+                     cisono=0;
+
+                     for (p = 0; p <= Fpackapp.n_hops; p++) {
                          if (Fpackapp.hops[p] == Pproto.rec_port){
                            cisono = 1;
                            break;
@@ -566,16 +596,14 @@ void *Gestione(void *arg) {
 
 
                      if(cisono==1){
-                         TRANSACTION *ptr;
+
                          ptr = searchChannel(Fpackapp.hops[p-1]);
                          printf("SONO INTERMEDIARIO E STO TORNANDO INDIETRO\n" );
                          write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
                      }
                       else{ //NON CI SONO NEGLI HOPS IL PACCHETTO DEVE AVANZARE
                          if(Fpackapp.n_hops < 3)  {
-                                TRANSACTION *ptr;
-                                TRANSACTION *punt;
-
+                                  printf("\n\n NON CI SONO, n_hops= %d\n\n",Fpackapp.n_hops);
                                 Fpackapp.n_hops++;
                                 Fpackapp.hops[Fpackapp.n_hops]=Pproto.rec_port;
                                 punt=searchChannel(Fpackapp.hops[Fpackapp.n_hops-1]);
@@ -593,8 +621,8 @@ void *Gestione(void *arg) {
                                         }
                                         else { // SE NON HO SALDO SUFFICIENTE
                                           printf("SENZA ALT SULLO STATE CHANNEL\n" );
-                                          ptr = searchChannel(Fpackapp.hops[Fpackapp.n_hops-1]);
-                                          write(ptr->fd, &Fpackapp,sizeof(struct floodPack));
+                                          //ptr = searchChannel(Fpackapp.hops[Fpackapp.n_hops-1]);
+                                          write(punt->fd, &Fpackapp,sizeof(struct floodPack));
                                                                                               /*Ricerco il mio predecessore nei
                                                                                                miei state channel Invio il pacchetto con reached=0*/
                                         }
@@ -622,10 +650,11 @@ void *Gestione(void *arg) {
 
                                 }
                                 else{ //SUPERATO LIMITE DI HOPS >3
-                                      TRANSACTION *ptr;
-                                      ptr=searchChannel(Fpackapp.hops[3]);
+
+
                                       Fpackapp.n_hops++;
                                       Fpackapp.hops[Fpackapp.n_hops]=Pproto.rec_port;
+                                      ptr=searchChannel(Fpackapp.hops[3]);
                                       write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
                                 }
                      }
@@ -700,6 +729,8 @@ void *channelConnect(void *arg) {
     int control;
     char appID;
     int appAmount;
+    static int retValue=0;
+
     int *portascelta = (int *)arg;
     TRANSACTION *app3 = searchChannel(*portascelta);
 
@@ -722,10 +753,12 @@ void *channelConnect(void *arg) {
         Fpack.saldoT=appAmount;
         Fpack.hops[0]=Pproto.rec_port;
         write(app3->fd, &Fpack, sizeof(struct floodPack));
+        retValue=0;
         system("clear");
       } else {
         system("clear");
         printf("NON PUOI EFFETTUARE QUESTO MOVIMENTO, FONDI SUL CANALE INSUFFICIENTI\n");
+        retValue=-1;
       }
 
       break;
@@ -749,10 +782,24 @@ void *channelConnect(void *arg) {
 
       case 3:
                 pthread_mutex_unlock(&mutex_controllo);
+                break;
     }
-    pthread_cancel(thread_action);
-    pthread_mutex_unlock(&mutex_choice);
-    return 0;
+    printf("ReTval dopo case %d\n",retValue);
+    if(retValue==-1){
+      //pthread_cancel(thread_action);
+      //pthread_mutex_unlock(&mutex_choice);
+      return (void*)&retValue;
+      //return (void*)retValue;
+    }else{
+
+      pthread_cancel(thread_action);
+      pthread_mutex_unlock(&mutex_choice);
+      //return (void*)retValue;
+      return (void*)&retValue;
+
+    }
+
+
   }
 
 void *menu_exec(void *arg) {

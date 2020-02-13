@@ -844,6 +844,13 @@ void *menu_exec(void *arg) {
       Pproto.flag = 1;
       break;
     case 3:
+      if(indexC<=0){
+        printf("Scelta non riconosciuta\n");
+        sleep(1);
+        system("clear");
+        pthread_mutex_unlock(&mutex_choice);
+        break;
+      }
       fflush(stdin);
       printf("\tLista State Channels\n");
       printChannels();
@@ -872,6 +879,9 @@ void *menu_exec(void *arg) {
       break;
     default:
       printf("Scelta non riconosciuta\n");
+      sleep(1);
+      system("clear");
+      pthread_mutex_unlock(&mutex_choice);
       break;
     }
     return 0;

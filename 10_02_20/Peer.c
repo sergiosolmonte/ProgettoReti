@@ -861,14 +861,18 @@ void *menu_exec(void *arg) {
       fflush(stdin);
       printf("\tLista State Channels\n");
       printChannels();
+
       printf("VUOI TERMINARE QUALCHE CANALE? \n 1) SI \n 2) NO\n");
       scanf("%d",&keyC);
 
       if(keyC==1){
+        app3=NULL;
+        while(app3==NULL){
             fflush(stdin);
             printf("\n INSERIRE LA PORTA DEL CANALE DA CHIUDERE \n");
             scanf("%d",&portToRem);
             app3 = searchChannel(portToRem);
+          }
             appFD = app3->fd;
             appID = app3->id;
             close(appFD);

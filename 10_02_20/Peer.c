@@ -92,13 +92,17 @@ TRANSACTION * trackerOff;
 
 
 
-// void sendMoney(void *);
+
 
 // GESTIONE RICHIESTE DI CONNESSIONE IN ENTRATA
+//La funzione peer accep è quella che aggiunge i nuovi peer, accettati dalla
+//funzione open_port con il  nuovo descrittore all'array fsetMaster.
+//attraverso lapthread-cancel e il mutex  presente nel menu impediamo che il menù stesso riparta e quindi causi errori
+//con le scanf e le stampe a schermo
 void *peerAccept(void *arg) {
 
   IN_PAUSE = 1;
-  int amount1;
+  int amount1=101;
   int lungh;
   int choice;
 
@@ -112,9 +116,13 @@ void *peerAccept(void *arg) {
   scanf("%d", &choice);
 
   if (choice == 3) {
+
+    while(amount1>Saldo){
+    fflush(stdin);
     printf("Quanto vuoi impegnare?\n AMOUNT = ");
     scanf("%d", &amount1);
     printf("\n" );
+  }
     pthread_mutex_lock(&mutex_fset);
     FD_SET(fd, &fsetmaster);
 
@@ -158,6 +166,9 @@ void *peerAccept(void *arg) {
   return 0;
 }
 
+//FUNZIONE IN LOOP CHE MANDA IL PING AL Tracker
+//Questa funzione a seconda del flag ci permette di ricevere i peer aggiuornati, inviare semplicemente il peer
+//ogni 2 secondi e verifica se il trakcer è ancora collegato alla rete.
 void *trackerConnect(void *arg) {
 
   pthread_mutex_lock(&mutex_tracker);
@@ -273,6 +284,10 @@ void *trackerConnect(void *arg) {
   return 0;
 }
 
+//FUNZIONE PER COLLEGARCI AD UN PEER
+//nel caso in cui fosse già presente uno stateC, la peer connect farebbe partire la channelConnect e a seconda
+//della risposta della chancConn la funzione decide se devi scorrere i suoi state per arrivare al peer RICHIESTO
+//tramite intermediari, se creare nun nuovo canale o se è impossibile scambiare ALT(caso in cui canale con saldo<amount).
 void *peerConnect(void *arg) {
 
   int porta;
@@ -330,7 +345,7 @@ void *peerConnect(void *arg) {
       TRANSACTION *appInter = channels->pnext;
       amount=traspAmount;
 
-      while(amount==0){
+      while(amount==0 ){
       printf("Quanto vuoi scambiare? (ALT>0)\n AMOUNT = ");
       fflush(stdin);
       scanf("%d", &amount);
@@ -411,7 +426,7 @@ void *peerConnect(void *arg) {
 
       }
       while(amount==0){
-      if (amount == 0) {
+      if (amount == 0 ) {
         printf("\nQUANTI ALT VUOI IMPEGNARE? \n(amount>0)\n AMOUNT = ");
         fflush(stdin);
         scanf("%d", &amount);
@@ -494,6 +509,11 @@ void *peerConnect(void *arg) {
   return 0;
 }
 
+//FUNZIONE GESTITA DAL MULTIPLEXER PER LE CONNESSIONI IN ENTRATA
+//Le connessioni in entrata, nel caso in cui sono un mittente, un destinatario o un INTERMEDIARIO
+//viene analizzato se il pacchetto deve andare in avanti o indietro tra peer nel caso in cui abbia raggiunto o meno il DESTINATARIO
+//la select ha un timer in modo tale che riesce ad aggiornare l'array fsetapp dato che l'array fsetmaster viene modificato
+//nella peeraccept
 void *Gestione(void *arg) {
 
   struct floodPack Fpackapp;
@@ -516,13 +536,13 @@ void *Gestione(void *arg) {
 
         if (FD_ISSET(indice, &appFset)) {
           pthread_cancel(thread_menu);
-          //printf("DENTRO L'ISSET\n");
           memset(&Fpackapp,0,sizeof(struct floodPack));
           read(indice, &Fpackapp, sizeof(struct floodPack));
 
 
           if(Fpackapp.dest_port==0){
-            printf("IL PEER NON COMUNICA PIÙ SULLA PORTA %d\n",getPort(indice) );                            // QUESTO CONTROLLO CI SERVE A CAPIRE SE UN PEER È MORTO E QUINDI SUL SUO DESCRITTORE RESTA BLOCCATO UN pacchetto
+            printf("IL PEER NON COMUNICA PIÙ SULLA PORTA %d\n",getPort(indice) ); // QUESTO CONTROLLO CI SERVE A CAPIRE SE UN PEER È MORTO
+                                                                                  //E QUINDI SUL SUO DESCRITTORE RESTA BLOCCATO UN pacchetto
             FD_CLR(indice,&fsetmaster);   //  INIZIALIZZATO A 0;
             indexC--;
             int portApp=getPort(indice);  //CERCO LA PORTA DA ELIMINARE NELLA LISTA ASSOCIATA A INDICE
@@ -549,7 +569,7 @@ void *Gestione(void *arg) {
             //Invio la risposta al descrittore dal quale ho ricevuto il pacchetto
             write(indice, &Fpackapp, sizeof(struct floodPack));
             pthread_mutex_unlock(&mutex_choice);
-            //pthread_mutex_unlock(&mutex_controllo);
+
           }
           //Se il pacchetto è già arrivato al destinatario
           else if(Fpackapp.reached==1){
@@ -584,100 +604,87 @@ void *Gestione(void *arg) {
 
                   write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
                   pthread_mutex_unlock(&mutex_choice);
-                  //pthread_mutex_unlock(&mutex_controllo);
+
                }
 
         }
         //REACHED==0
         else{
-               if (Fpackapp.hops[0] == Pproto.rec_port){ // SONO IL MITTENTE MA NON HO TROVATO IL PEER/STABILITO LA CONNESSIONE
-                     printf("SONO IL MITTENTE E NON HO TROVATO PASSANDO PER %d\n", Fpackapp.hops[1]);                           // O_PEERNONTROVMITT
-                     Fpack=Fpackapp;
-                     Fpack.reached = 0;
-                     pthread_mutex_unlock(&mutex_flooding);
-               }
-               else{ //SE NON SONO IL MITTENTE ALLORA SONO UN INTERMEDIARIO
+             if (Fpackapp.hops[0] == Pproto.rec_port){ // SONO IL MITTENTE MA NON HO TROVATO IL PEER/STABILITO LA CONNESSIONE
+                   printf("SONO IL MITTENTE E NON HO TROVATO PASSANDO PER %d\n", Fpackapp.hops[1]);                           // O_PEERNONTROVMITT
+                   Fpack=Fpackapp;
+                   Fpack.reached = 0;
+                   pthread_mutex_unlock(&mutex_flooding);
+             }
+             else{ //SE NON SONO IL MITTENTE ALLORA SONO UN INTERMEDIARIO
 
-                     printf("SONO UN INTERMEDIARIO,REACHED 0 ciao %c porta richiesta: %d \n", Pproto.name,Fpackapp.dest_port);
+                   printf("SONO UN INTERMEDIARIO,REACHED 0 ciao %c porta richiesta: %d \n", Pproto.name,Fpackapp.dest_port);
 
 
-                     cisono=0;
+                   cisono=0;
 
-                     for (p = 0; p <= Fpackapp.n_hops; p++) {
-                         if (Fpackapp.hops[p] == Pproto.rec_port){
-                           cisono = 1;
-                           break;
+                   for (p = 0; p <= Fpackapp.n_hops; p++) {
+                       if (Fpackapp.hops[p] == Pproto.rec_port){
+                         cisono = 1;
+                         break;
+                        }
+                    }
+
+                   if(cisono==1){
+
+                       ptr = searchChannel(Fpackapp.hops[p-1]);
+                       printf("SONO INTERMEDIARIO E STO TORNANDO INDIETRO\n" );
+                       write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
+                   }
+                    else{ //NON CI SONO NEGLI HOPS IL PACCHETTO DEVE AVANZARE
+                       if(Fpackapp.n_hops < 3)  {
+                              printf("\n\n NON CI SONO, n_hops= %d\n\n",Fpackapp.n_hops);
+                              Fpackapp.n_hops++;
+                              Fpackapp.hops[Fpackapp.n_hops]=Pproto.rec_port;
+                              punt=searchChannel(Fpackapp.hops[Fpackapp.n_hops-1]);
+                              ptr=searchChannel(Fpackapp.dest_port);
+
+                              //Se ho uno state channel con il destinatario
+                              if (ptr != NULL) {
+                                    if (ptr->stateP >= Fpackapp.saldoT) { // Se ho saldo disponibile sul canale
+                                                                          // con il destinatario, faccio flooding in avanti
+                                      printf("HO SALDO E COMUNICO CON %c \n",ptr->id);
+                                      write(ptr->fd, &Fpackapp, sizeof(struct floodPack));
+
+                                      }
+                                      else { // SE NON HO SALDO SUFFICIENTE
+                                        printf("SENZA ALT SULLO STATE CHANNEL\n" );
+
+                                        write(punt->fd, &Fpackapp,sizeof(struct floodPack));  /*Ricerco il mio predecessore nei miei state
+                                                                                              channel Invio il pacchetto con reached=0*/
+                                      }
+                                }
+                                else{ //NON HO UN COLLEGAMENTO DIRETTO CON IL PEER  DESTINATARIO RICHEISTO
+                                    ptr=channels->pnext;
+
+                                    while(ptr!=NULL){
+                                      if(ptr==channels->pnext && ptr->pnext==NULL){
+                                          write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
+                                      }
+                                      if(ptr!=punt){
+                                         write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
+                                      }
+                                         ptr=ptr->pnext;
+                                     }
+                                }
+
                           }
-                      }
-
-
-                     if(cisono==1){
-
-                         ptr = searchChannel(Fpackapp.hops[p-1]);
-                         printf("SONO INTERMEDIARIO E STO TORNANDO INDIETRO\n" );
-                         write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
-                     }
-                      else{ //NON CI SONO NEGLI HOPS IL PACCHETTO DEVE AVANZARE
-                         if(Fpackapp.n_hops < 3)  {
-                                  printf("\n\n NON CI SONO, n_hops= %d\n\n",Fpackapp.n_hops);
+                          else{ //SUPERATO LIMITE DI HOPS >3
                                 Fpackapp.n_hops++;
                                 Fpackapp.hops[Fpackapp.n_hops]=Pproto.rec_port;
-                                punt=searchChannel(Fpackapp.hops[Fpackapp.n_hops-1]);
-                                ptr=searchChannel(Fpackapp.dest_port);
-
-                                //Se ho uno state channel con il destinatario
-                                if (ptr != NULL) {
-                                      if (ptr->stateP >= Fpackapp.saldoT) { // Se ho saldo disponibile sul canale
-                                                                            // con il destinatario, faccio flooding in avanti
-                                        printf("HO SALDO E COMUNICO CON %c \n",ptr->id);
-                                        //ptr->stateP = ptr->stateP - Fpackapp.saldoT;
-                                        //punt->stateP=punt->stateP+Fpackapp.saldoT;
-                                        write(ptr->fd, &Fpackapp, sizeof(struct floodPack));
-
-                                        }
-                                        else { // SE NON HO SALDO SUFFICIENTE
-                                          printf("SENZA ALT SULLO STATE CHANNEL\n" );
-                                          //ptr = searchChannel(Fpackapp.hops[Fpackapp.n_hops-1]);
-                                          write(punt->fd, &Fpackapp,sizeof(struct floodPack));
-                                                                                              /*Ricerco il mio predecessore nei
-                                                                                               miei state channel Invio il pacchetto con reached=0*/
-                                        }
-                                  }
-                                  else{ //NON HO UN COLLEGAMENTO DIRETTO CON IL PEER  DESTINATARIO RICHEISTO
-                                      ptr=channels->pnext;
-
-                                      while(ptr!=NULL){
-
-
-                                                if(ptr==channels->pnext && ptr->pnext==NULL){
-                                                    write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
-                                                }
-
-                                                 if(ptr!=punt){
-
-                                                   write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
-                                                 }
-
-                                                 ptr=ptr->pnext;
-
-
-                                       }
-                                  }
-
-                                }
-                                else{ //SUPERATO LIMITE DI HOPS >3
-
-
-                                      Fpackapp.n_hops++;
-                                      Fpackapp.hops[Fpackapp.n_hops]=Pproto.rec_port;
-                                      ptr=searchChannel(Fpackapp.hops[3]);
-                                      write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
-                                }
-                     }
-                     pthread_mutex_unlock(&mutex_choice);
-
+                                ptr=searchChannel(Fpackapp.hops[3]);
+                                write(ptr->fd,&Fpackapp,sizeof(struct floodPack));
+                          }
                }
-        }
+               pthread_mutex_unlock(&mutex_choice);
+
+             }
+           }
         }
 
 
@@ -693,6 +700,8 @@ void *Gestione(void *arg) {
     return 0;
   }
 
+//FUNZIONE CHE MANTIENE LA PORTA APERTA
+//resta sempre in ascolto di nuove connessioni
 void *openPort(void *arg) {
 
     int choice;
@@ -739,6 +748,9 @@ void *openPort(void *arg) {
     exit(0);
   }
 
+//FUNZIONE CHE PERMETTE LA COMUNICAZIONE SU STATE Channels
+//Permette di inviare o chiude uno state channel. Quando si vuole inviare la funzione restituisce
+//-1 se il saldso sul canale è < alla cifra che si vuole scambiare, 0 se riesce a scambiare.
 void *channelConnect(void *arg) {
 
     int keyC, appFD;
@@ -794,31 +806,26 @@ void *channelConnect(void *arg) {
 
       pthread_mutex_unlock(&mutex_controllo);
 
-      //printf("SALDO TOTALE = %d\n", Saldo );
       break;
 
       case 3:
                 pthread_mutex_unlock(&mutex_controllo);
                 break;
     }
-    //printf("ReTval dopo case %d\n",retValue);
     if(retValue==-1){
-      //pthread_cancel(thread_action);
-      //pthread_mutex_unlock(&mutex_choice);
       return (void*)&retValue;
-      //return (void*)retValue;
     }else{
 
       pthread_cancel(thread_action);
       pthread_mutex_unlock(&mutex_choice);
-      //return (void*)retValue;
       return (void*)&retValue;
-
     }
+}
 
 
-  }
-
+//ESECUZIONE DEL menu
+//Permette di collegarsi,visualizzare i peer disponibili inviando una flag al tracker e visualizzare i canali APERTi
+//se disponibili. Tutto gestito da mutex e thread_cancel;
 void *menu_exec(void *arg) {
 
     printf("CIAO PEER %c/%d, Premi: \n 1) Per collegarti ad un Peer\n 2) Per "
